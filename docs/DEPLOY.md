@@ -142,6 +142,19 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 
 没装开机自启的话，最后一步改成重新双击 `start-windows.bat`。
 
+#### 在设置里一键更新（本机）
+
+服务器启动后，**在本机**打开游戏 → 设置 → 「游戏更新」：
+
+- 「检查更新」会读取本仓库 GitHub Release 的最新版本；
+- 只有两种包：`-update.zip`（只覆盖它声明的旧版本，**不允许跨版本**）与 `-lite.zip`（含全部代码/数据，**可跨版本**）；
+- 应用更新包时会**同时下载同版本的精简包**做一致性校验：更新包里的每个文件必须与精简包逐字节一致，精简包的 `MANIFEST.json` 作为完整文件清单，用来修复缺失文件和删除旧文件；
+- 覆盖前把旧文件备份到 `.update-backup/<时间戳>/`；`plugins/`、账号数据、素材、缓存永不触碰；
+- 服务器由 systemd 托管（`Restart=always`）时更新后自动重启；否则面板会提示手动重启。
+
+> 该接口只对**本机回环**开放：局域网/公网访问 `/api/update/*` 一律 404。需要远程操作时用 SSH 隧道把 3001 映射到本机。
+> 如果服务器上装了本地补丁（例如账号/成就），部署后仍需回灌补丁；也可以在 systemd 里设置 `SP_UPDATE_PATCH_CMD`，让更新器在重启前自动执行补丁脚本。
+
 #### 用整合包安装的：更新包
 
 0.2.1 起，Releases 里每个版本除了完整包和精简包，还有更新包 `Stronghold-Protocol-v<版本>-update.zip`：只含比说明中列出的旧版本改动过的文件（程序、数据、运行依赖，以及改动过的素材），通常只有几 MB。它用来升级用 0.2.0 及以后的完整包或精简包装好的文件夹（适用的版本写在 Releases 说明里）；全新安装、0.1.x 和 GitHub「Download ZIP」源码包请用完整包或精简包，`git clone` 的用上面的 `git pull`。

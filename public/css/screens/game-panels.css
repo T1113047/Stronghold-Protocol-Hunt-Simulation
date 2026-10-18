@@ -974,3 +974,10 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   .offerov .spov__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .offerov .spcard__icon { width: .6rem; height: .6rem; }
+
+/* [UPDATE] 设置 → 游戏更新 */
+.set-update { display: flex; flex-direction: column; gap: .06rem; }
+.set-update__now { font-variant-numeric: tabular-nums; color: var(--text-mid); }
+.set-update__actions { flex-wrap: wrap; gap: .06rem; }
+.set-update__note.is-ok { color: var(--ok, #58d68d); }
+.set-update__note.is-err { color: var(--danger, #e74c3c); }

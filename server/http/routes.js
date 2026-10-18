@@ -29,6 +29,9 @@ import { setSecurityHeaders, sendError, sendJson, splitUrl } from './common.js';
 import { isReapPath, readBody, reapRooms, roomsApiAllowed, roomsPayload, REAP_BODY_MAX } from './rooms.js';
 import { clientAddress, isLocalIp } from '../net.js';
 
+/** 严格回环（更新接口只认这个；isLocalIp 还包含局域网）。 */
+const isLoopback = (ip) => ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+
 const MAX_URL_LENGTH = 4096;
 /** POST /api/notify body cap (one announcement text, net.js NOTICE_MAX_LEN is 200 code points). */
 const NOTIFY_BODY_MAX = 4096;
@@ -90,7 +93,7 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, updater = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -109,6 +112,36 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     if (parts.rawPath === '/healthz') {
       const withTraffic = wantsTraffic(parts.query) && isLocalIp(clientAddress(req, trustProxy).ip);
       sendJson(req, res, 200, healthReport(health, withTraffic));
+      return;
+    }
+    // [UPDATE] 在线更新（设置 → 游戏更新）：只有本机回环能检查/应用；非本机一律 404（不暴露存在性）
+    if (parts.rawPath === '/api/update/status' || parts.rawPath === '/api/update/check' || parts.rawPath === '/api/update/apply') {
+      if (!isLoopback(clientAddress(req, trustProxy).ip)) { sendError(req, res, 404, '未找到 · Not found'); return; }
+      const isApply = parts.rawPath === '/api/update/apply';
+      if (isApply ? req.method !== 'POST' : (req.method !== 'GET' && req.method !== 'HEAD')) {
+        sendError(req, res, 405, '不支持的请求方法 · Method not allowed');
+        return;
+      }
+      if (!updater) { sendJson(req, res, 200, { ok: false, error: 'unavailable' }); return; }
+      if (!isApply) {
+        const cur = updater.current();
+        if (parts.rawPath === '/api/update/status') { sendJson(req, res, 200, { ok: true, allowed: true, current: cur }); return; }
+        try {
+          const latest = await updater.check(true);
+          sendJson(req, res, 200, { ok: true, allowed: true, current: cur, latest });
+        } catch (e) {
+          sendJson(req, res, 200, { ok: false, allowed: true, current: cur, error: 'github', detail: String(e && e.message ? e.message : e) });
+        }
+        return;
+      }
+      try {
+        const raw = (await readBody(req, 4096)).toString('utf8');
+        const body = raw ? JSON.parse(raw) : {};
+        const out = await updater.apply(String(body.kind || ''));
+        sendJson(req, res, 200, { ok: true, ...out });
+      } catch (e) {
+        sendJson(req, res, 200, { ok: false, error: 'update', detail: String(e && e.message ? e.message : e) });
+      }
       return;
     }
     // [ROOMS-API] 运维查询接口（本机 QQ 机器人）：GET /api/rooms 快照 · POST /api/rooms/reap 收房。
