@@ -24,7 +24,7 @@ test('the merchant button sits above the 金币 card and uses the official 坎�
   const shop = src('public/js/ui/shopBar.js');
   const merchant = src('public/js/ui/merchant.js');
   // rendered inside the funds card, BEFORE the coin hex (visually above) — and only when the server sends the panel
-  assert.match(shop, /\$\{merchant \? html`<\$\{Merchant\} merchant=\$\{merchant\} editable=\$\{editable\} onWithdraw=\$\{onWithdraw\} vertical=\$\{true\} versus=\$\{versus\} \/>` : null\}/);
+  assert.match(shop, /\$\{merchant \? html`<\$\{Merchant\} merchant=\$\{merchant\} editable=\$\{editable\} onWithdraw=\$\{onWithdraw\} vertical=\$\{true\} versus=\$\{versus\} remind=\$\{merchantRemind\} \/>` : null\}/);
   assert.ok(shop.indexOf('<${Merchant}') < shop.indexOf('class="funds__hex"'), 'the merchant is above the coin hex');
   assert.match(shop, /<span class="funds__label">\$\{t\('金币'\)\}<\/span>/, 'the funds card is labelled 金币');
   // the avatar is the strategy 坎诺特 (data/bands.json band_cannot -> icon_cannot) and reuses the band icon URL
@@ -34,6 +34,22 @@ test('the merchant button sits above the 金币 card and uses the official 坎�
   // wired through the game screen and the action layer
   assert.match(src('public/js/screens/game.js'), /merchant=\$\{priv\?\.merchant \|\| null\} onWithdraw=\$\{\(gold\) => actions\.merchantWithdraw\(gold\)\}/);
   assert.match(src('public/js/ui/gameActions.js'), /merchantWithdraw: \(gold\) => act\('g\.confront\.withdraw', \{ gold \}/);
+});
+
+test('the last round with a non-zero bank pulses the merchant and names the reminder', () => {
+  const merchant = src('public/js/ui/merchant.js');
+  const shop = src('public/js/ui/shopBar.js');
+  const game = src('public/js/screens/game.js');
+  const css = src('public/css/screens/game-shop.css');
+  assert.match(merchant, /remind && 'merchant--remind'/, 'the pulsing class');
+  assert.match(merchant, /t\('最后一回合：还有赏金未取出，点击坎诺特兑换'\)/, 'the title explains the reminder');
+  assert.match(merchant, /t\('最后回合 · 取出赏金'\)/, 'the label under the icon');
+  assert.match(shop, /remind=\$\{merchantRemind\}/, 'ShopBar forwards the reminder');
+  assert.match(game, /merchantRemind=\$\{!!priv\?\.merchant && Number\(priv\.merchant\.bank\) > 0 && Number\(pub\?\.round\) >= Number\(pub\?\.lastRound\)\}/,
+    'only on the last round, only with a non-zero bank');
+  assert.match(css, /\.merchant--remind \.merchant__btn \{[^}]*animation: merchant-remind/);
+  assert.match(css, /@keyframes merchant-remind/);
+  for (const k of ['最后一回合：还有赏金未取出，点击坎诺特兑换', '最后回合 · 取出赏金']) inEveryPack(k);
 });
 
 test('the dialog shows the rate, the bank, the round\'s maximum gold and every option\'s 赏金 cost', () => {

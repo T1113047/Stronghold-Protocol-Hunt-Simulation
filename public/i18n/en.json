@@ -2472,5 +2472,7 @@
   "选择「自己」时所有数值 ×2；连续数值按 1 + (基础 − 1) × 2 计算。": "Choosing Self doubles every value; continuous values use 1 + (base − 1) × 2.",
   "本回合的敌人": "This round's enemies",
   "本队已选 {n}/{total}": "Your team has picked {n}/{total}",
-  "本期事件词条": "This period's event entries"
+  "本期事件词条": "This period's event entries",
+  "最后一回合：还有赏金未取出，点击坎诺特兑换": "Last round: bounty is still banked — open Cantor to withdraw it",
+  "最后回合 · 取出赏金": "Last round · withdraw"
 }

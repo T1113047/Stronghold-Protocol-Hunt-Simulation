@@ -185,6 +185,13 @@
 }
 .merchant__btn:hover:not(:disabled) { box-shadow: 0 0 .16rem rgba(242, 189, 62, .5); transform: translateY(-1px); }
 .merchant__btn:disabled { opacity: .45; cursor: default; }
+/* last round with a non-zero bank: the icon pulses so the merchant is not forgotten before the match ends */
+.merchant--remind .merchant__btn { border-color: var(--gold-2); animation: merchant-remind 1.4s ease-in-out infinite; }
+.merchant--remind .merchant__label { color: #ffe08a; font-weight: 800; }
+@keyframes merchant-remind {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 189, 62, .65), 0 0 .08rem rgba(242, 189, 62, .35); }
+  50% { box-shadow: 0 0 0 .09rem rgba(242, 189, 62, 0), 0 0 .24rem rgba(242, 189, 62, .8); }
+}
 .merchant__art { display: block; width: 100%; height: 100%; overflow: hidden; }
 .merchant__art img, .merchant__art svg { width: 100%; height: 100%; object-fit: cover; }
 .merchant__art svg { fill: var(--gold); }

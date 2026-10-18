@@ -303,7 +303,7 @@ export function RewardCards({ offer, priv, editable, onPick, onDetail, onLater, 
  *   (the merchant tip names the opponent's placement rather than the co-op hunt's)
  */
 export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onCollapse, onBuy, onLevel, onRefresh, onFreeze, onDetail, onDetailClose, onRefuse, barRef,
-  reward = null, onReward, onRewardLater, onArm = null, offBonds = null, merchant = null, onWithdraw = null, versus = false }) {
+  reward = null, onReward, onRewardLater, onArm = null, offBonds = null, merchant = null, onWithdraw = null, versus = false, merchantRemind = false }) {
   const shop = priv?.shop || {};
   const slots = Array.isArray(shop.slots) ? shop.slots : [];
   const chessSlots = slots.map((s, i) => ({ s, i })).filter(({ s }) => !s || s.kind !== 'item');
@@ -396,7 +396,7 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
           : html`<${SoldCard} item=${true} />`}
       </div>`}
       <div class="funds">
-        ${merchant ? html`<${Merchant} merchant=${merchant} editable=${editable} onWithdraw=${onWithdraw} vertical=${true} versus=${versus} />` : null}
+        ${merchant ? html`<${Merchant} merchant=${merchant} editable=${editable} onWithdraw=${onWithdraw} vertical=${true} versus=${versus} remind=${merchantRemind} />` : null}
         <div class="funds__hex">
           <${CoinGlyph} class="funds__coin" />
           <b class="funds__num num">${funds}</b>

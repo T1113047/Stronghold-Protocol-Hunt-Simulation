@@ -1753,6 +1753,7 @@ function MatchScreen() {
         reward=${phase === PHASE.PREP && !rewardMin ? priv?.shop?.rewardOffer || null : null}
         onReward=${(i) => actions.reward(i)} onRewardLater=${() => setRewardMin(true)} onArm=${setArmedCard}
         merchant=${priv?.merchant || null} onWithdraw=${(gold) => actions.merchantWithdraw(gold)}
+        merchantRemind=${!!priv?.merchant && Number(priv.merchant.bank) > 0 && Number(pub?.round) >= Number(pub?.lastRound)}
         versus=${myTeam != null} />` : null}
 
       ${phase === PHASE.PREP && priv?.shop?.rewardOffer ? html`<${RewardOverlay} priv=${priv} minimized=${rewardMin || barCollapsed}

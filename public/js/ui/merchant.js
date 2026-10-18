@@ -16,11 +16,12 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
 /**
  * @param {{ merchant: any, editable?: boolean, busy?: boolean, onWithdraw?: (gold: number) => void, class?: string,
- *   vertical?: boolean, versus?: boolean }} props
+ *   vertical?: boolean, versus?: boolean, remind?: boolean }} props
  *   `merchant` = m.private.merchant (server-authored: { bank, rate, cap, withdrawn, left, max, options[] }) or null.
  *   `versus`: 2V2 (the prey is the opponent's placement) vs 同盟狩猎 (the system places it) — the tip's wording only.
+ *   `remind`: the last round and the bank is still non-zero — pulse the merchant until the bounty is withdrawn.
  */
-export function Merchant({ merchant, editable = false, busy = false, onWithdraw, class: cls, vertical = false, versus = false }) {
+export function Merchant({ merchant, editable = false, busy = false, onWithdraw, class: cls, vertical = false, versus = false, remind = false }) {
   const gd = useGameData();
   const [open, setOpen] = useState(false);
   const [armed, setArmed] = useState(null);
@@ -41,14 +42,14 @@ export function Merchant({ merchant, editable = false, busy = false, onWithdraw,
     setArmed(null);
     onWithdraw?.(opt.gold);
   };
-  return html`<div class=${cx('merchant', vertical && 'merchant--v', cls)}>
+  return html`<div class=${cx('merchant', vertical && 'merchant--v', remind && 'merchant--remind', cls)}>
     <button type="button" class="merchant__btn" data-testid="merchant-btn" disabled=${!canOpen}
-      title=${t('存在坎诺特处的赏金')} aria-label=${t('坎诺特')} aria-disabled=${canOpen ? 'false' : 'true'}
+      title=${remind ? t('最后一回合：还有赏金未取出，点击坎诺特兑换') : t('存在坎诺特处的赏金')} aria-label=${t('坎诺特')} aria-disabled=${canOpen ? 'false' : 'true'}
       onClick=${() => { if (canOpen) { setOpen(true); setArmed(null); } }}>
       <span class="merchant__art"><${Img} src=${bandIconUrl(gd.m, 'band_cannot')} fallback=${html`<${CoinGlyph} />`} /></span>
       ${bank > 0 ? html`<span class="merchant__bank num" data-testid="merchant-bank">${bank}</span>` : null}
     </button>
-    <span class="merchant__label">${t('赏金')}</span>
+    <span class="merchant__label">${remind ? t('最后回合 · 取出赏金') : t('赏金')}</span>
 
     <${Modal} open=${open} onClose=${close} title=${t('坎诺特')} micro="MERCHANT // BOUNTY" width="6.9rem" class="merchant-dlg">
       <div class="merchant__head">
