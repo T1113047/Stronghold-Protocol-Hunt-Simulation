@@ -55,7 +55,11 @@ export function confrontValue(e, scale = null) {
   const hp = num(s.maxHp) * (Number.isFinite(scale && scale.hpMul) ? scale.hpMul : 1);
   const atk = num(s.atk) * (Number.isFinite(scale && scale.atkMul) ? scale.atkMul : 1);
   const blocks = e && e.isFlyEnemy ? 2 : num(s.blockCnt);
-  return Math.round(hp + atk * 2 + num(s.def) * 2 + num(s.res) * 15 + Math.max(0, num(s.lpr) - 1) * hp * 0.6 + blocks * 60);
+  const stat = hp + atk * 2 + num(s.def) * 2 + num(s.res) * 15 + Math.max(0, num(s.lpr) - 1) * hp * 0.6 + blocks * 60;
+  // 远程怪 (applyWay RANGED) 能越过阻挡输出，价值按 1.5 倍计价（维护者 2026-10-18）。
+  // 与特性分同处一个价值表：confrontTraitStep 用同一个 confrontValue 标定，所以特性仍占整表 30%。
+  const ranged = e && e.applyWay === 'RANGED' ? 1.5 : 1;
+  return Math.round(stat * ranged);
 }
 
 /** The enemies normal waves really spawn: factions.json `templateSlots` + every type's `pool` / `entries`. */
