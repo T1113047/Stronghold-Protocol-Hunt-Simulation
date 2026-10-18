@@ -205,7 +205,7 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           <p class="spov__sub">${timed ? (personal ? t('休整期结束时未选择将自动选定') : t('倒计时结束后仍未选定将自动分配')) : t('选择一项（无时间限制）')}${mine == null && myTurn ? t(' · 点击卡牌选中，再次点击确认') : ''}</p>
         </div>
         <div class="spov__turn">
-          ${sp.order.length === 2 && sp.cards.length <= 4
+          ${sp.versus && sp.cards.length <= 4
             ? html`<span class="spov__turntxt t-dim">${t('本队已选 {n}/{total}', { n: sp.pickOf ? sp.pickOf.size : 0, total: sp.order.length })}</span>`
             : null}
           ${personal ? html`<span class="spov__turntxt is-mine">${t('从候选中选择一项战术特训')}</span>`

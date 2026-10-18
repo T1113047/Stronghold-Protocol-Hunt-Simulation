@@ -101,7 +101,7 @@ test('2V2: four cards render in the 4-card grid and the header shows the team pi
   const four = ChoiceView({
     pub: { players, deadline: 0 }, myId: 'me', solo: false,
     sp: sp({
-      order: ['me', 'p1'], turnPid: 'p1', pickOf: new Map([['me', 0]]),
+      order: ['me', 'p1'], turnPid: 'p1', pickOf: new Map([['me', 0]]), versus: true,
       cards: [0, 1, 2, 3].map((i) => ({ idx: i, name: `C${i}`, desc: '', takenBy: i === 0 ? 'me' : null })),
     }),
   });

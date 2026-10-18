@@ -251,6 +251,9 @@ export function phaseTotalSeconds(pub, config, myId = null) {
     case PHASE.BATTLE_CHECK: return num(timers.battleCheck) ?? 3;
     case PHASE.SP_DRAFT: {
       const sp = normalizeSp(pub.sp, pub.players);
+      // the server's current turn length (2V2 team 1's first pick is the GLOBAL second turn: spTurn, not spFirst)
+      const given = num(sp && sp.turnSeconds);
+      if (given) return given;
       const first = !sp || sp.pickedCount === 0;
       return first ? (num(timers.spFirst) ?? 30) : (num(timers.spTurn) ?? 16);
     }

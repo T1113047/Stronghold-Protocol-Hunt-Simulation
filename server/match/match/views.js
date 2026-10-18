@@ -300,7 +300,8 @@ export class MatchViews {
       return {
         family: info.family ?? null, name: info.name ?? null, desc: info.desc ?? null, eventId: info.eventId ?? null,
         cards: cardsOf(s.cards), order: s.order.slice(), turn: this.spTurn(), waiting: false,
-        picks: { ...s.picks }, taken: { ...s.taken }, untimed: !!s.untimed,
+        picks: { ...s.picks }, taken: { ...s.taken }, untimed: !!s.untimed, versus: false,
+        turnSeconds: Number(s.turnSeconds) || 0,
       };
     }
     const info = infoOf(team);
@@ -318,7 +319,8 @@ export class MatchViews {
       order: s.order.filter((pid) => this.teamIdOf(this.players.get(pid)) === team),
       turn: curTeam === team ? curPid : null,
       waiting: !!curPid && curTeam !== team,
-      picks, taken, untimed: !!s.untimed,
+      picks, taken, untimed: !!s.untimed, versus: true,
+      turnSeconds: Number(s.turnSeconds) || 0,
     };
   }
 

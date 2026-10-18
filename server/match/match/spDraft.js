@@ -113,6 +113,7 @@ export class MatchSpDraft {
 
   startSpTurn() {
     const s = this.sp;
+    if (this.phase !== PHASE.SP_DRAFT || !s) return;
     this.cancel(this._turnTimer);
     this._turnTimer = null;
     while (s.idx < s.order.length) { // loop-cap: draft order
@@ -120,23 +121,32 @@ export class MatchSpDraft {
       if (ps && ps.alive && s.picks[ps.playerId] == null) break;
       s.idx++;
     }
+    if (s.idx >= s.order.length) { this.setDeadline(0); this.later(0, () => this.finishSpDraft()); return; }
     const cur = this.players.get(this.spTurn());
     const available = this.spCardsFor(cur).filter(c => this.spCardAvailable(c)).map(c => c.idx);
-    if (s.idx >= s.order.length || !available.length) { this.setDeadline(0); this.later(0, () => this.finishSpDraft()); return; }
+    if (!available.length) {
+      // a seat whose pool is sold out / shorter than expected is skipped; the other seats still pick (2V2: the other
+      // team must not lose its remaining picks because this team's board ran dry)
+      s.idx++;
+      this.later(0, () => this.startSpTurn());
+      return;
+    }
     const token = ++this._turnToken;
     if (!s.untimed) {
       const first = s.idx === 0;
       const secs = first ? this.gd.timer('spFirst') : this.gd.timer('spTurn');
+      s.turnSeconds = secs;
       this.setDeadline(secs, () => {
         if (this.phase !== PHASE.SP_DRAFT || token !== this._turnToken) return;
         const ps = this.players.get(this.spTurn());
         if (!ps) return;
         const avail = this.spCardsFor(ps).filter(c => this.spCardAvailable(c)).map(c => c.idx);
-        if (!avail.length) { this.finishSpDraft(); return; }
+        if (!avail.length) { s.idx++; this.startSpTurn(); return; }
         this._applyCard(ps, avail[Math.floor(this.rngDraft() * avail.length)]);
       });
       s.turnDeadline = this.deadline;
     } else {
+      s.turnSeconds = 0;
       this.setDeadline(0);
     }
     if (cur && cur.botControlled) this.scheduleSpBot();
@@ -151,7 +161,7 @@ export class MatchSpDraft {
       if (!ps || !ps.botControlled) return;
       const avail = this.spCardsFor(ps).filter(c => this.spCardAvailable(c)).map(c => c.idx);
       if (!avail.length) return;
-      this._applyCard(ps, botPickCard(this, ps, this.spCardsFor(ps), avail));
+      this._applyCard(ps, botPickCard(this, ps, this.sp.cards, avail));
     });
   }
 

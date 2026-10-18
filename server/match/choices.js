@@ -451,6 +451,12 @@ function bountyVersusPair(gd, rng, round, sch) {
   }
   while (a.length > VERSUS_TEAM_CARDS) b.push(a.pop());
   while (b.length > VERSUS_TEAM_CARDS) a.push(b.pop());
+  while (a.length < VERSUS_TEAM_CARDS && b.length > VERSUS_TEAM_CARDS) a.push(b.pop());
+  while (b.length < VERSUS_TEAM_CARDS && a.length > VERSUS_TEAM_CARDS) b.push(a.pop());
+  if (a.length !== VERSUS_TEAM_CARDS || b.length !== VERSUS_TEAM_CARDS) return null;
+  // the same tier multiset on both sides; a pool too thin for that falls back to 道具补给 rather than an unfair board
+  const tierKey = (list) => list.map((c) => bountyTierOf(c)).sort().join(',');
+  if (tierKey(a) !== tierKey(b)) return null;
   return { teams: [rng.shuffle(a.map((c) => bountyCard(gd, c))), rng.shuffle(b.map((c) => bountyCard(gd, c)))] };
 }
 
@@ -470,7 +476,10 @@ function supplyVersusPair(gd, rng, sch, itemAvailable) {
       list = eligibleItems(gd, lo, hi);
       if (itemAvailable) list = list.filter(itemAvailable);
     }
-    if (!list.length) list = eligibleItems(gd, 1, 6);
+    if (!list.length) {
+      list = eligibleItems(gd, 1, 6);
+      if (itemAvailable) list = list.filter(itemAvailable);
+    }
     return list.length ? itemCard(gd, list[Math.floor(rng() * list.length)]) : null;
   };
   const a = tiers.map(draw);
@@ -500,15 +509,19 @@ function tacticVersusPair(gd, rng, opts) {
   return a.length && b.length ? { teams: [a, b] } : null;
 }
 
-/** One family's two 4-card boards (shop: its unchanged 3-card official draw, one per team). */
-function buildVersusPair(gd, rng, family, round, sch, opts) {
+/** One family's two 4-card boards (shop: its unchanged 3-card official draw, one per team). Exported for tests. */
+export function buildVersusPair(gd, rng, family, round, sch, opts) {
   if (family === 'bounty') return bountyVersusPair(gd, rng, round, sch);
   if (family === 'supply') return supplyVersusPair(gd, rng, sch, opts.itemAvailable);
   if (family === 'tactic') return tacticVersusPair(gd, rng, { stageId: opts.stageId, bondAvailable: opts.bondAvailable, round });
   if (family === 'shop') {
-    const a = shopDraftCards(gd, rng, VERSUS_SHOP_CARDS, round, opts.itemAvailable);
-    const b = shopDraftCards(gd, rng, VERSUS_SHOP_CARDS, round, opts.itemAvailable);
-    return a && b ? { teams: [a, b] } : null;
+    // R11 uses the official slot draw; other rounds keep the old I–VI random-item fallback (buildCards), still under the
+    // 机密商店 family — never a silent switch to 道具补给 just because shopDraft.rounds does not list the round.
+    const a = shopDraftCards(gd, rng, VERSUS_SHOP_CARDS, round, opts.itemAvailable)
+      || buildCards(gd, rng, 'shop', VERSUS_SHOP_CARDS, sch, opts);
+    const b = shopDraftCards(gd, rng, VERSUS_SHOP_CARDS, round, opts.itemAvailable)
+      || buildCards(gd, rng, 'shop', VERSUS_SHOP_CARDS, sch, opts);
+    return a.length && b.length ? { teams: [a, b] } : null;
   }
   return null;
 }

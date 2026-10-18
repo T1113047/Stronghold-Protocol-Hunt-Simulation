@@ -77,6 +77,8 @@ export function normalizeSp(sp, players = []) {
     untimed: !!sp.untimed,
     // 2V2: true while the OTHER team decides (the two teams alternate, so a team that finished its picks first waits)
     waiting: !!sp.waiting,
+    versus: !!sp.versus,
+    turnSeconds: Number.isFinite(sp.turnSeconds) ? Number(sp.turnSeconds) : null,
     cards, order, turnPid, pickOf, takenBy, pickedCount: pickOf.size,
   };
 }
