@@ -267,8 +267,7 @@ export function EventOverlay({ pub, busy = false, onPick }) {
     <div class="spov__inner">
       <header class="spov__head">
         <div class="spov__titles">
-          <${MicroLabel} tone="mint">EVENT PHASE // ${t('事件期')}</${MicroLabel}>
-          <h2 class="spov__title">${t('事件期')}
+          <h2 class="spov__title"><span class="spov__name"><${MicroLabel} tone="mint">EVENT PHASE // ${t('事件期')}</${MicroLabel}>${t('事件期')}</span>
             <span class="spov__bar">|</span><span class="spov__desc" data-testid="event-index">${t('第 {n}/{total} 次', { n: index, total })}</span></h2>
           <p class="spov__sub">${myPick ? t('已选择，等待其他玩家') : t('选择这次词条送给谁')}</p>
         </div>

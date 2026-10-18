@@ -334,11 +334,10 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
     <div class="spov__inner">
       <header class="spov__head">
         <div class="spov__titles">
-          <${MicroLabel} tone="mint">HUNTING PHASE // ${t('狩猎期')}</${MicroLabel}>
           ${stage === 'target'
-            ? html`<h2 class="spov__title">${t('选择你要针对的对手')}
+            ? html`<h2 class="spov__title"><span class="spov__name"><${MicroLabel} tone="mint">HUNTING PHASE // ${t('狩猎期')}</${MicroLabel}>${t('选择你要针对的对手')}</span>
                 <span class="spov__bar">|</span><span class="spov__desc">${t('第 {r} 回合 · 对手以 ? 显示，只看编号', { r: conf.round })}</span></h2>`
-            : html`<h2 class="spov__title">${t('为 {p} 定制怪物', { p: myTarget ? pNo(foes.find((f) => f.playerId === myTarget)) || '?' : '?' })}
+            : html`<h2 class="spov__title"><span class="spov__name"><${MicroLabel} tone="mint">HUNTING PHASE // ${t('狩猎期')}</${MicroLabel}>${t('为 {p} 定制怪物', { p: myTarget ? pNo(foes.find((f) => f.playerId === myTarget)) || '?' : '?' })}</span>
                 <span class="spov__bar">|</span><span class="spov__desc">${t('第 {r} 回合 · 你的怪只会出现在这个对手的波次', { r: conf.round })}</span></h2>`}
           <p class="spov__sub">${stage === 'target'
             ? (myTarget ? t('已锁定目标，等待队友与对手') : t('点击一个 ? 头像框锁定你的目标'))

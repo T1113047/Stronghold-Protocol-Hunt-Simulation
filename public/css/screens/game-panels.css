@@ -397,6 +397,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .spov__title.is-special .spov__bar { background: var(--gold-2); }
 .spov__desc { grid-row: 1; grid-column: 3; align-self: end; font-size: calc(.26 * var(--t)); font-weight: 700; color: #d6fbef; letter-spacing: .04em; text-shadow: none; }
 .spov__sub { grid-row: 2; grid-column: 3; align-self: start; font-size: calc(.15 * var(--t)); color: #a2aaa8; }
+/* the hunt overlays keep their phase kicker inside the name column (the 0.3.1 grid has no own slot for it) */
+.spov__name .micro { display: block; margin-bottom: .06rem; }
 .spov__turn { display: flex; align-items: center; gap: .24rem; }
 .spov__turntxt { display: flex; align-items: center; gap: .08rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: var(--text-md); }
 .spov__turntxt .icon { width: .26rem; height: .26rem; }
@@ -747,6 +749,23 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .eqr__ok-icon { width: .2rem; height: .2rem; margin-right: .06rem; vertical-align: -.03rem; filter: brightness(0) invert(1); }
 
 /* 2V2 对抗期 overlay (ui/confrontOverlay.js) — reuses the .spov shell classes */
+/* The 0.3.1 header is a 3-column grid (name | rule | description). The 狩猎期 overlay carries a much wider action row
+   than 机变 has (自动选择 / 沿用上轮 / 提交（n 只 · …）), so on a desktop the description column was squeezed to one
+   character and the whole phase header read vertically (user report 2026-10-18). Stack this header: the title block
+   keeps the full width, the actions sit on their own line and wrap when the screen is narrow. ui/eventOverlay.js
+   (evov) and ui/rosterPanel.js (rospov) share the shell but have a compact turn row, so they keep the one-line head. */
+.confov .spov__head { flex-direction: column; align-items: stretch; gap: .08rem; }
+.confov .spov__turn { flex-wrap: wrap; justify-content: flex-end; row-gap: .06rem; }
+/* The panel itself scrolls when a short screen cannot hold the header plus the picking body (the two columns' own
+   max-heights stay, so the list still scrolls on its own inside a tall panel). */
+.confov .spov__inner, .evov .spov__inner, .rospov .spov__inner {
+  overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(234, 255, 248, .28) transparent;
+}
+.confov .spov__inner::-webkit-scrollbar, .evov .spov__inner::-webkit-scrollbar, .rospov .spov__inner::-webkit-scrollbar { width: .08rem; }
+.confov .spov__inner::-webkit-scrollbar-thumb, .evov .spov__inner::-webkit-scrollbar-thumb, .rospov .spov__inner::-webkit-scrollbar-thumb {
+  background: rgba(234, 255, 248, .26); border-radius: .04rem;
+}
 .confov__groups { display: grid; grid-template-columns: repeat(4, 1fr); gap: .08rem; margin: .1rem 0; }
 .confgroup { display: flex; flex-direction: column; gap: .05rem; padding: .1rem; border: 2px solid var(--line-3); border-radius: .1rem; background: rgba(255, 255, 255, .05); cursor: pointer; text-align: left; color: inherit; }
 .confgroup.is-sel { border-color: var(--mint-400); }
@@ -758,9 +777,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .confgroup__icons { display: flex; flex-wrap: wrap; gap: .03rem; }
 .confgroup__ic { width: .28rem; height: .28rem; display: inline-flex; }
 .confgroup__ic img { width: 100%; height: 100%; object-fit: contain; }
-/* the picking area owns the rest of the panel and scrolls: a type's pool and the placed list each get their own wheel
-   (the dialog itself never grows past the screen, so the 提交 button in the header always stays reachable) */
-.confov__body { display: grid; grid-template-columns: 1fr 1fr; gap: .14rem; flex: 1 1 auto; min-height: 0; }
+/* the picking area takes its own content height; the panel (.spov__inner) scrolls when the screen is too short, while
+   a type's pool and the placed list keep their own wheel (the 提交 button stays in the header above them) */
+.confov__body { display: grid; grid-template-columns: 1fr 1fr; gap: .14rem; flex: 0 0 auto; min-height: 0; }
 .confov__pool, .confov__placed { display: flex; flex-direction: column; min-height: 0; }
 .confov__h { font-size: calc(.17 * var(--t)); margin: 0 0 .06rem; flex: 0 0 auto; }
 /* 本回合还能放 n 只 (user 2026-10-17): resident above the picking body — remaining value ÷ the current type's
@@ -782,8 +801,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   background: rgba(234, 255, 248, .26); border-radius: .04rem;
 }
 .confov__chips::-webkit-scrollbar-thumb:hover, .confov__list::-webkit-scrollbar-thumb:hover { background: rgba(234, 255, 248, .42); }
-.confov__chips { display: flex; flex-wrap: wrap; gap: .05rem; flex: 1 1 auto; min-height: 1.2rem; overflow-y: auto; overscroll-behavior: contain; }
-.cchip { display: inline-flex; align-items: center; gap: .04rem; padding: .03rem .07rem; border: 1px solid var(--line-3); border-radius: .09rem; background: rgba(255, 255, 255, .04); cursor: pointer; color: inherit; }
+.confov__chips { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: .05rem; flex: 1 1 auto; min-height: 1.2rem; overflow-y: auto; overscroll-behavior: contain; }
+.cchip { display: inline-flex; align-items: center; gap: .04rem; flex: 0 0 auto; max-width: 100%; padding: .03rem .07rem; border: 1px solid var(--line-3); border-radius: .09rem; background: rgba(255, 255, 255, .04); cursor: pointer; color: inherit; }
 .cchip:disabled { opacity: .4; cursor: default; }
 .cchip__icon { width: .3rem; height: .3rem; }
 .cchip__icon img { width: 100%; height: 100%; object-fit: contain; }
@@ -808,6 +827,15 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .confrow__order { display: flex; gap: .02rem; }
 .confrow__order button { background: transparent; border: none; color: var(--text-md); cursor: pointer; padding: .02rem; }
 .confov__empty, .confov__hint { padding: .2rem; text-align: center; }
+/* narrow screens: 4 type cards and 2 picking columns would be narrower than their own labels; stack them and let the
+   .spov__inner scroll (a portrait phone has ~6rem of usable width inside the overlay) */
+@media (max-width: 900px) {
+  .confov__groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .confov__body { grid-template-columns: minmax(0, 1fr); }
+  .confov__chips, .confov__list { max-height: none; }
+}
 
 /* 对抗期 step 1: the opponents as '?' frames — team colour + P number only (the client never learns who they are) */
 .confov__targets { display: flex; flex-direction: column; align-items: center; gap: .16rem; padding: .12rem 0 .2rem; }

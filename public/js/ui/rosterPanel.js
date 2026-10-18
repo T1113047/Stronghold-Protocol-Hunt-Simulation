@@ -30,8 +30,7 @@ export function RosterPanel({ title, micro = null, tone = 'gold', rows = [], unt
     <div class="spov__inner">
       <header class="spov__head">
         <div class="spov__titles">
-          ${micro ? html`<${MicroLabel} tone=${tone}>${micro}</${MicroLabel}>` : null}
-          <h2 class="spov__title">${title}</h2>
+          <h2 class="spov__title"><span class="spov__name">${micro ? html`<${MicroLabel} tone=${tone}>${micro}</${MicroLabel}>` : null}${title}</span></h2>
         </div>
         ${remain != null ? html`<span class="rospov__timer" data-testid="roster-timer" role="timer">
           ${t('{s} 秒后开始作战', { s: remain })}

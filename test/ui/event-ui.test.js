@@ -43,7 +43,8 @@ test('the panel exists for PHASE.EVENT with its title, the 第 n/3 次 line and 
   assert.match(OVERLAY, /export function EventOverlay\(\{ pub, busy = false, onPick \}\)/);
   assert.match(OVERLAY, /data-testid="event-phase"/);
   assert.match(OVERLAY, /role="dialog" aria-label=\$\{t\('事件期'\)\}/);
-  assert.match(OVERLAY, /<h2 class="spov__title">\$\{t\('事件期'\)\}/);
+  assert.match(OVERLAY, /<h2 class="spov__title"><span class="spov__name">/);
+  assert.match(OVERLAY, /EVENT PHASE \/\/ \$\{t\('事件期'\)\}<\/\$\{MicroLabel\}>\$\{t\('事件期'\)\}<\/span>/);
   assert.match(OVERLAY, /t\('第 \{n\}\/\{total\} 次', \{ n: index, total \}\)/);
   // the countdown: the server deadline of THIS period (ally.deadline), EVENT_PICK_SECONDS as the gauge total
   assert.match(OVERLAY, /<div class="spov__timer" data-testid="event-timer">/);
