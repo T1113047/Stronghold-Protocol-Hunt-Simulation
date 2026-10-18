@@ -806,6 +806,14 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   background: rgba(234, 255, 248, .26); border-radius: .04rem;
 }
 .confov__chips::-webkit-scrollbar-thumb:hover, .confov__list::-webkit-scrollbar-thumb:hover { background: rgba(234, 255, 248, .42); }
+/* touch: a wide, always-visible track — tapping the track pages the column instead of dragging a 3 px thumb (the two
+   columns each scroll their own panel; user 2026-10-18) */
+@media (pointer: coarse) {
+  .confov__chips, .confov__list { scrollbar-width: auto; }
+  .confov__chips::-webkit-scrollbar, .confov__list::-webkit-scrollbar { width: .16rem; }
+  .confov__chips::-webkit-scrollbar-track, .confov__list::-webkit-scrollbar-track { background: rgba(234, 255, 248, .08); }
+  .confov__chips::-webkit-scrollbar-thumb, .confov__list::-webkit-scrollbar-thumb { background: rgba(234, 255, 248, .34); border-radius: .08rem; }
+}
 .confov__chips { display: flex; flex-wrap: wrap; align-items: flex-start; align-content: flex-start; gap: .05rem; flex: 1 1 auto; min-height: 1.2rem; overflow-y: auto; overscroll-behavior: contain; }
 .cchip { display: inline-flex; align-items: center; gap: .04rem; flex: 0 0 auto; max-width: 100%; padding: .03rem .07rem; border: 1px solid var(--line-3); border-radius: .09rem; background: rgba(255, 255, 255, .04); cursor: pointer; color: inherit; }
 .cchip:disabled { opacity: .4; cursor: default; }
@@ -1009,16 +1017,16 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .confclash__p { position: absolute; right: .02rem; bottom: 0; font-size: .14rem; font-weight: 700; padding: 0 .04rem; background: rgba(8, 11, 10, .9); }
 .confclash__side--blue .confclash__p { color: #8cc6ff; }
 .confclash__side--red .confclash__p { color: #ffab97; }
-.confclash__mid { display: flex; align-items: center; gap: .04rem; flex-wrap: wrap; max-width: min(10.2rem, 62vw); justify-content: center; }
-.confclash__mid img { width: .36rem; height: .36rem; object-fit: contain; }
-.confclash__more { flex: none; padding: 0 .04rem; font-size: calc(.12 * var(--t)); font-weight: 800; color: var(--text-md); }
+.confclash__mid { display: flex; align-items: center; gap: .05rem; flex: 1 1 auto; min-width: 0; max-width: none; justify-content: flex-start; }
+.confclash__mid img { width: .42rem; height: .42rem; object-fit: contain; }
+.confclash__more { flex: none; padding: 0 .04rem; font-size: calc(.13 * var(--t)); font-weight: 800; color: var(--text-md); }
 .confclash__vs { font-size: .46rem; font-weight: 700; color: var(--orange-hi); animation: clashHit 5.2s ease both; }
 .confclash .confclash__coin { font-size: calc(.14 * var(--t)); font-weight: 700; color: var(--gold); white-space: nowrap; }
 /* The seat / source line (P1 / P2 …, "P1 已选择", the P label of a bounty row): one step BELOW body text, always a
    single horizontal line, ellipsised instead of wrapping into a stack on a narrow phone (user 2026-10-17). */
 .confseat { font-size: calc(.10 * var(--t)); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .confclash__row { flex-wrap: nowrap; white-space: nowrap; min-width: 0; }
-.confclash__mid { flex-wrap: nowrap; overflow: hidden; }
+.confclash__mid { flex-wrap: wrap; overflow: visible; }
 @media (max-height: 431.98px) {
   /* landscape phone: the two picking columns keep ≥ 3 rows of chips without pushing the panel past the screen */
   .confov__remain { font-size: calc(.12 * var(--t)); padding: .02rem .08rem; }
