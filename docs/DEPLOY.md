@@ -146,14 +146,15 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 
 服务器启动后，**在本机**打开游戏 → 设置 → 「游戏更新」：
 
-- 「检查更新」会读取本仓库 GitHub Release 的最新版本；
-- 只有两种包：`-update.zip`（只覆盖它声明的旧版本，**不允许跨版本**）与 `-lite.zip`（含全部代码/数据，**可跨版本**）；
-- 应用更新包时会**同时下载同版本的精简包**做一致性校验：更新包里的每个文件必须与精简包逐字节一致，精简包的 `MANIFEST.json` 作为完整文件清单，用来修复缺失文件和删除旧文件；
-- 覆盖前把旧文件备份到 `.update-backup/<时间戳>/`；`plugins/`、账号数据、素材、缓存永不触碰；
-- 服务器由 systemd 托管（`Restart=always`）时更新后自动重启；否则面板会提示手动重启。
+- 「检查更新」读取本仓库 GitHub Release 的最新版本；
+- 更新只下载两个**精简包**：目标版本的 `-lite.zip` 与当前版本的 `-lite.zip`（不再使用 `-update.zip`）；
+- 用两份 `MANIFEST.json` 的 sha256 做差分：**只写真正变化的文件**，未变化的本地文件（包括本地补丁）保持原样；旧清单里有、新清单里没有的文件会被删除；
+- 每个写入的文件都要对得上目标清单的 sha256；覆盖前把旧文件备份到 `.update-backup/<时间戳>/`；
+- `plugins/`、账号数据、素材、缓存、`.studio-key` 永不触碰；
+- 服务器由 systemd 托管（`Restart=always`）时更新后自动重启；否则面板提示手动重启；更新会结束当前对局。
 
 > 该接口只对**本机回环**开放：局域网/公网访问 `/api/update/*` 一律 404。需要远程操作时用 SSH 隧道把 3001 映射到本机。
-> 如果服务器上装了本地补丁（例如账号/成就），部署后仍需回灌补丁；也可以在 systemd 里设置 `SP_UPDATE_PATCH_CMD`，让更新器在重启前自动执行补丁脚本。
+> 如果服务器装了本地补丁（例如账号/成就），可以在 systemd 里设置 `SP_UPDATE_PATCH_CMD`，更新器会在重启前自动执行补丁脚本（例如 `/root/patches/hunt-account-ach/apply.sh --no-restart`）。
 
 #### 用整合包安装的：更新包
 
