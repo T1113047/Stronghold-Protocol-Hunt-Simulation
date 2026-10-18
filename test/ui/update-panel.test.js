@@ -18,8 +18,7 @@ test('the settings modal mounts the update section; the panel talks to the two l
   assert.match(panel, /\/api\/update\/apply/);
   assert.match(panel, /data-testid="game-update"/);
   assert.match(panel, /JSON\.stringify\(\{ kind \}\)/);
-  assert.match(panel, /apply\('update'\)/);
-  assert.match(panel, /apply\('lite'\)/);
+  assert.match(panel, /onClick=\$\{apply\}/);
   // 非本机（status 404）时不渲染
   assert.match(panel, /if \(!current\) return null/);
 });
@@ -44,7 +43,7 @@ test('the server exposes the update routes for the loopback client only', () => 
   assert.match(routes, /isLocalIp\(clientAddress\(req, trustProxy\)\.ip\)/, 'loopback gate');
   const upd = read('server/updateOnline.js');
   assert.match(upd, /not a Hunt Simulation package/);
-  assert.match(upd, /不允许跨版本/);
-  assert.match(upd, /同版本精简包|缺少同版本精简包/);
+  assert.match(upd, /当前版本/);
+  assert.match(upd, /差分|sha256/);
   assert.match(upd, /plugins\//, 'user plugins are kept');
 });

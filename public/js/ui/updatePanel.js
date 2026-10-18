@@ -71,8 +71,7 @@ export function UpdateSection({ fetchImpl = globalThis.fetch } = {}) {
   };
 
   const newer = latest && cmp(latest.version, current.fork) > 0;
-  const hasUpdateAsset = !!(latest && latest.assets && latest.assets.update);
-  const hasLiteAsset = !!(latest && latest.assets && latest.assets.lite);
+  const hasLite = !!(latest && latest.lite);
 
   return html`<section class="set-update" aria-labelledby="set-update-title" data-testid="game-update">
     <div class="set-row">
@@ -86,13 +85,11 @@ export function UpdateSection({ fetchImpl = globalThis.fetch } = {}) {
     <div class="set-seg set-update__actions">
       <${Button} variant="secondary" icon="download" disabled=${busy === 'check'} onClick=${check}>
         ${latest ? t('重新检查') : t('检查更新')}<//>
-      ${newer && hasUpdateAsset ? html`<${Button} variant="primary" icon="check" disabled=${!!busy}
-        onClick=${() => apply('update')}>${t('下载并更新（更新包）')}<//>` : null}
-      ${newer && hasLiteAsset ? html`<${Button} variant=${hasUpdateAsset ? 'secondary' : 'primary'} icon="download" disabled=${!!busy}
-        onClick=${() => apply('lite')}>${t('下载并更新（精简包）')}<//>` : null}
+      ${newer && hasLite ? html`<${Button} variant="primary" icon="download" disabled=${!!busy}
+        onClick=${apply}>${t('下载并更新（精简包）')}<//>` : null}
     </div>
-    ${busy === 'update' || busy === 'lite' ? html`<p class="set-hint">${t('正在下载并应用…')}</p>` : null}
+    ${busy === 'apply' ? html`<p class="set-hint">${t('正在下载并应用…')}</p>` : null}
     ${note ? html`<p class=${`set-hint set-update__note is-${note.kind}`} data-testid="update-note">${note.text}</p>` : null}
-    <p class="set-hint">${t('只从本仓库的 GitHub Release 拉取；更新包只能覆盖它声明的旧版本，精简包可跨版本。更新会重启服务器并结束当前对局。')}</p>
+    <p class="set-hint">${t('只从本仓库的 GitHub Release 拉取；更新会下载目标版本与当前版本的精简包做差分，只覆盖变化的文件，未变化的本地文件（含本地补丁）保持原样。更新会重启服务器并结束当前对局。')}</p>
   </section>`;
 }

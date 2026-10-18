@@ -137,7 +137,7 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
       try {
         const raw = (await readBody(req, 4096)).toString('utf8');
         const body = raw ? JSON.parse(raw) : {};
-        const out = await updater.apply(String(body.kind || ''));
+        const out = await updater.apply();
         sendJson(req, res, 200, { ok: true, ...out });
       } catch (e) {
         sendJson(req, res, 200, { ok: false, error: 'update', detail: String(e && e.message ? e.message : e) });
