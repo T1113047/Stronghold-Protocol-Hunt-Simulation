@@ -253,7 +253,7 @@ const hasZipTool = !spawnSync('zip', ['-v'], { encoding: 'utf8' }).error
   || /bsdtar/.test(spawnSync('tar', ['--version'], { encoding: 'utf8' }).stdout || '');
 const hasUnzip = !spawnSync('unzip', ['-h'], { encoding: 'utf8' }).error;
 
-test('a --no-install build of the temporary checkout zips exactly the plan in one Stronghold-Protocol/ folder', { skip: !hasZipTool && 'no zip / tar' }, () => {
+test('a --no-install build of the temporary checkout zips exactly the plan in one Hunt-Simulation/ folder', { skip: !hasZipTool && 'no zip / tar' }, () => {
   const { dir } = fakeCheckout();
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-package-out-'));
   try {
@@ -420,8 +420,8 @@ test('asset pack plan: the listed art with the effects and the default page; man
   try {
     const p = assetPackPlan(dir, { env: ENV });
     assert.deepEqual(p.problems, []);
-    assert.equal(p.name, 'Stronghold-Protocol-v9.9.9-assets');
-    assert.equal(assetPackName('0.3.0'), 'Stronghold-Protocol-v0.3.0-assets');
+    assert.equal(p.name, 'Hunt-Simulation-v9.9.9-assets');
+    assert.equal(assetPackName('0.3.0'), 'Hunt-Simulation-v0.3.0-assets');
     assert.deepEqual(p.files, PACK_ART);
     assert.deepEqual(p.notListed, ['public/assets/local/fx/prefabs/unused.json', 'public/assets/local/g/x.png', 'public/fonts/x.woff2'],
       'the full zip ships them; the import would skip them');
@@ -452,7 +452,7 @@ test('--assets: a dry run lists the pack and writes nothing; it never combines w
     const dry = runTool(['--root', dir, '--assets', '--dry-run', '--list']);
     assert.equal(dry.status, 0, dry.stdout + dry.stderr);
     assert.deepEqual(listed(dry.stdout), [...PACK_ART, ASSET_PACK_README]);
-    assert.match(dry.stdout, /^asset pack: Stronghold-Protocol-v9\.9\.9-assets\.zip · version 9\.9\.9/m);
+    assert.match(dry.stdout, /^asset pack: Hunt-Simulation-v9\.9\.9-assets\.zip · version 9\.9\.9/m);
     assert.match(dry.stdout, /^left out: 3 files the full zip ships from public\/ that no manifest lists/m);
     assert.match(dry.stdout, /^checks: ok$/m);
     assert.deepEqual(fs.readdirSync(dir).sort(), before, 'a dry-run writes nothing');
@@ -472,7 +472,7 @@ test('the README names the version, the manifests it matches, how to import, and
   assert.ok(text.startsWith('\ufeff卫戍协议：盟约 v0.3.0 素材包\n'), 'UTF-8 with a BOM');
   for (const s of ['data/assets.json、data/local-assets.json、data/local-fx.json', '「导入素材包」', '「选择 zip」', '「跳过 1 个」',
     'HTTPS', 'localhost', '"Import asset pack"', 'files that version does not list are skipped', '2 files (3.0 MB)',
-    'https://github.com/sganggs/Stronghold-Protocol/blob/v0.3.0/NOTICE.md']) assert.ok(text.includes(s), s);
+    'https://github.com/T1113047/Stronghold-Protocol-Hunt-Simulation/blob/v0.3.0/NOTICE.md']) assert.ok(text.includes(s), s);
   const dev = assetPackReadme({ version: '0.3.1-dev', files: [], bytes: { art: 0 }, local: false, fx: false });
   assert.ok(dev.includes('/blob/v0.3.1/NOTICE.md') && !dev.includes('local-fx.json'));
 });
@@ -519,7 +519,7 @@ test('a --assets build zips exactly the plan and README.txt in one folder, and t
     const r = runTool(['--root', dir, '--assets', '--out', out]);
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /^not a release asset: offer it for download elsewhere/m);
-    const name = 'Stronghold-Protocol-v9.9.9-assets';
+    const name = 'Hunt-Simulation-v9.9.9-assets';
     const zip = path.join(out, `${name}.zip`);
     assert.deepEqual(fs.readdirSync(out), [`${name}.zip`], 'the stage is removed after zipping');
     if (hasUnzip) {
@@ -573,7 +573,7 @@ test('a --assets build of a development version needs --allow-dev', { skip: !has
     assert.deepEqual(fs.readdirSync(out), []);
     const dev = runTool(['--root', dir, '--assets', '--out', out, '--allow-dev']);
     assert.equal(dev.status, 0, dev.stdout + dev.stderr);
-    assert.ok(fs.existsSync(path.join(out, 'Stronghold-Protocol-v9.9.9-dev-assets.zip')));
+    assert.ok(fs.existsSync(path.join(out, 'Hunt-Simulation-v9.9.9-dev-assets.zip')));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(out, { recursive: true, force: true });

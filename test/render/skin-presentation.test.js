@@ -27,6 +27,12 @@ function fixture() {
     let mode = 'battle', lastPrep = null;
     const board3d = null;
     function resize() {} function syncOfficialFx() {} function heightAt() { return 0; }
+    function boardPreference(v) { return v === 'flat' ? 'flat' : '3d'; }
+    function boardSetting() { return 'auto'; }
+    function applyBoardMode() { return Promise.resolve(true); }
+    function unitSetting(s) { return s && s.unitModels; }
+    function weakGpu() { return false; }
+    const opts = {}; const t = (s) => s;
     function setPrep() { syncReadOnlyPrepUnits(lastPrep.units); }
     ${source.slice(start, end)}
     ${['applyInfo', 'refreshSkins', 'setMe', 'setSkins', 'syncReadOnlyPrepUnits'].map(bodyOf).join('\n')}

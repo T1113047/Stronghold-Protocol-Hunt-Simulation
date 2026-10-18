@@ -250,7 +250,7 @@ test('bases are refused when they cannot be one: lite, an update zip, not older,
       assert.equal(r.status, 1, r.stdout);
       assert.match(r.stderr, re);
     };
-    refuse(lite, /has no game art \(a lite zip\?\): pass the full zip, Stronghold-Protocol-v9\.9\.8\.zip/);
+    refuse(lite, /has no game art \(a lite zip\?\): pass the full zip, Hunt-Simulation-v9\.9\.8\.zip/);
     refuse(update, /is an update package: pass the earlier release's full zip/);
     refuse(`${full},${full}`, /two bases are v9\.9\.8/);
     refuse(path.join(out, 'nothing.zip'), /not found/);
@@ -325,7 +325,7 @@ test('the zip reader: stored and deflated entries, zip64, UTF-8 names; damaged a
       const bytes = fs.readFileSync(path.join(dir, 'stored.zip'));
       bytes[bytes.indexOf(Buffer.alloc(64, 7)) + 100] ^= 0xff;
       fs.writeFileSync(path.join(dir, 'bad.zip'), bytes);
-      assert.throws(() => readBase(path.join(dir, 'bad.zip')), /bad\.zip: Stronghold-Protocol\/public\/assets\/卫戍 a\.png: CRC mismatch/);
+      assert.throws(() => readBase(path.join(dir, 'bad.zip')), /bad\.zip: Hunt-Simulation\/public\/assets\/卫戍 a\.png: CRC mismatch/);
     }
     const cut = fs.readFileSync(path.join(dir, zipped[0]));
     fs.writeFileSync(path.join(dir, 'cut.zip'), cut.subarray(0, cut.length - 30));
@@ -333,7 +333,7 @@ test('the zip reader: stored and deflated entries, zip64, UTF-8 names; damaged a
     // entries outside the one folder: not a release zip
     put(dir, 'other/x.txt', 'x');
     const z = spawnSync('zip', ['-q', '-r', 'foreign.zip', 'other'], { cwd: dir });
-    if (!z.error && z.status === 0) assert.throws(() => readBase(path.join(dir, 'foreign.zip')), /outside the Stronghold-Protocol\/ folder/);
+    if (!z.error && z.status === 0) assert.throws(() => readBase(path.join(dir, 'foreign.zip')), /outside the (?:Hunt-Simulation|Stronghold-Protocol)\/ folder/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

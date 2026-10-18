@@ -171,7 +171,9 @@ function walk(dir, rel = '', out = []) {
  * @param {{ folder?: string, skip?: (rel: string) => boolean }} [opts]
  * @returns {{ source: string, version: string, files: Map<string, { size: number, sha256: string }>, art: number, update: boolean }}
  */
-export function readBase(source, { folder = 'Stronghold-Protocol', skip = () => false } = {}) {
+export function readBase(source, { folder = null, skip = () => false } = {}) {
+  // accept either release folder: this fork's Hunt-Simulation/ and the upstream Stronghold-Protocol/
+  const FOLDERS = folder ? [folder] : ['Hunt-Simulation', 'Stronghold-Protocol'];
   const abs = path.resolve(source);
   let st;
   try { st = fs.statSync(abs); } catch { throw new Error(`base ${source}: not found`); }
@@ -185,7 +187,7 @@ export function readBase(source, { folder = 'Stronghold-Protocol', skip = () => 
   };
   if (st.isDirectory()) {
     let root = abs;
-    if (!fs.existsSync(path.join(root, 'package.json')) && fs.existsSync(path.join(root, folder, 'package.json'))) root = path.join(root, folder);
+    if (!fs.existsSync(path.join(root, 'package.json'))) for (const f of FOLDERS) if (fs.existsSync(path.join(root, f, 'package.json'))) { root = path.join(root, f); break; }
     if (!fs.existsSync(path.join(root, 'package.json'))) throw new Error(`base ${source}: no package.json (pass a release's full zip or the folder it was extracted to)`);
     for (const rel of walk(root)) {
       const p = path.join(root, ...rel.split('/'));
@@ -194,16 +196,21 @@ export function readBase(source, { folder = 'Stronghold-Protocol', skip = () => 
       add(rel, d, () => fs.readFileSync(p));
     }
   } else {
-    const prefix = `${folder}/`;
+    let prefix = null;
     try {
       readZip(abs, (name, data) => {
-        if (!name.startsWith(prefix)) throw new Error(`${name} is outside the ${folder}/ folder (not a release zip)`);
+        if (prefix === null) {
+          const m = /^(Hunt-Simulation|Stronghold-Protocol)\//.exec(name);
+          if (!m) throw new Error(`${name} is outside the release folder (not a release zip)`);
+          prefix = m[1] + '/';
+        }
+        if (!name.startsWith(prefix)) throw new Error(`${name} is outside the ${prefix} folder (not a release zip)`);
         add(name.slice(prefix.length), { size: data.length, sha256: sha(data) }, () => data);
       });
     } catch (e) {
       throw new Error(`base ${source}: ${e.message}`, { cause: e });
     }
-    if (!pkg) throw new Error(`base ${source}: no ${folder}/package.json (not a release zip)`);
+    if (!pkg) throw new Error(`base ${source}: no release package.json (not a release zip)`);
   }
   const version = pkg?.version;
   if (typeof version !== 'string' || !/^\d+\.\d+\.\d+/.test(version)) throw new Error(`base ${source}: package.json names no version`);
