@@ -39,7 +39,11 @@ Solo FUNNY has 9 rounds (boss at R9); everything is read from `data/config.json 
 **2V2 ('versus', DESIGN §35).** `ROOM_MODES` adds `versus`: two teams of `TEAM_SIZE` 2 (`teamOfSeat`: seats 0,1 → team 0;
 2,3 → team 1), empty seats AI-filled at the start. Each team holds ONE shared HP pool = Σ its members' band HP
 (`MatchInfra.initTeamHp`, `m.teamLps`; the members' `ps.lp` are a split of it) plus its own 5 banned core bonds, chess pool
-and 3 机变 cards; the stage, boss and factions stay shared. From the drawn contest round (`Match.contestStartRound`, one of
+and 4 机变 cards (the 机密商店 keeps its official 3-card draw); the stage, boss and factions stay shared. The two teams always
+draw the SAME 机变 family for a round, and each team's board has the same fixed gradient: 悬赏决策 I×2 + II×1 + III×1
+(eight distinct cards, I×4/II×2/III×2 across both), 道具补给 lo×2 + mid×1 + hi×1, 战术决策 2 team-wide + 2 personal. Each
+player picks one card, so a team takes 2 of its 4 (shop 2 of 3); the opponent's board stays hidden. From the drawn contest round
+(`Match.contestStartRound`, one of
 R4/R5/R6; `m.public.contestStartRound`) to the round before `bossRound`, a non-boss round's PREP is followed by CONFRONT
 (狩猎期, `server/match/match/confront.js`): both sides pair one-to-one and each player fills a per-player value budget from
 the official 特训敌人 types against ONE opponent's next wave; a placed monster leaks for free (`countInTotal: false`) and

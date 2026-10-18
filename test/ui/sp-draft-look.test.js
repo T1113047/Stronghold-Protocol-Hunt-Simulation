@@ -96,3 +96,19 @@ test('the top bar stays on screen during the shared draft', () => {
   assert.doesNotMatch(css, /has-spdraft[^{]*\.gtop[^{]*\{[^}]*(visibility:\s*hidden|display:\s*none|opacity:\s*0)/);
   assert.match(css, /\.spov__inner \{ position: absolute; left: \.3rem; right: \.5rem; top: 1\.14rem;/, 'the overlay starts below the top bar');
 });
+
+test('2V2: four cards render in the 4-card grid and the header shows the team pick count', () => {
+  const four = ChoiceView({
+    pub: { players, deadline: 0 }, myId: 'me', solo: false,
+    sp: sp({
+      order: ['me', 'p1'], turnPid: 'p1', pickOf: new Map([['me', 0]]),
+      cards: [0, 1, 2, 3].map((i) => ({ idx: i, name: `C${i}`, desc: '', takenBy: i === 0 ? 'me' : null })),
+    }),
+  });
+  const nodes = [...walk(four)];
+  assert.ok(nodes.some((n) => hasClass(n, 'spov__grid--4')), 'the four-card grid');
+  assert.ok(!nodes.some((n) => hasClass(n, 'spov__grid--3')), 'not the three-card grid');
+  assert.match(textOf(four), /本队已选 1\/2/);
+  assert.match(read('public/css/screens/game-panels.css'), /\.spov__grid--4 \{/);
+  assert.match(read('public/css/screens/game-panels.css'), /@media \(max-width: 900px\) \{\s*\.spov__grid--4/);
+});

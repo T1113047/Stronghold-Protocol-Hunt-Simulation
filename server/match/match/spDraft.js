@@ -5,7 +5,7 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { PHASE, ERR } from '../../../shared/constants.js';
-import { generateDraft, applyCard, bountyBattles, isMultiRoundBounty, bountyCard } from '../choices.js';
+import { generateDraft, generateVersusDrafts, VERSUS_TEAM_CARDS, VERSUS_SHOP_CARDS, applyCard, bountyBattles, isMultiRoundBounty, bountyCard } from '../choices.js';
 import { onPickCard } from '../botEmotes.js';
 import { weightedPick } from '../waves.js';
 import { botPickCard } from '../bot.js';
@@ -15,10 +15,12 @@ import { OK, fail, DELAYS } from './common.js';
 const PERSONAL_OFFER_SIZE = 3;
 
 /**
- * Cards each team is offered in the 2V2 机变 draft: co-op's shared 6-card draw halves to 3 per team, so a team's two
- * teammates pick from their OWN 3 (the user's rule) instead of all four seats sharing one 3-card draw.
+ * Cards each team is offered in the 2V2 机变 draft: four cards with the same fixed gradient as the opponent (I×2 + II×1
+ * + III×1 for bounties, lo×2 + mid×1 + hi×1 for supplies, 2 team + 2 personal tactics), so neither side draws a better
+ * board. The 机密商店 family keeps its official 3-card draw (the user: 商店不动).
  */
-export const VERSUS_SP_CARDS = 3;
+export const VERSUS_SP_CARDS = VERSUS_TEAM_CARDS;
+export { VERSUS_SHOP_CARDS };
 
 export class MatchSpDraft {
   enterSpDraft() {
@@ -30,15 +32,20 @@ export class MatchSpDraft {
     let teams;
     let head = null; // the single shared draw's family/name/desc (solo/co-op; 2V2 keeps them per team instead)
     if (this.isVersus) {
+      const pair = generateVersusDrafts(this.gd, this.rngDraft, this.round, {
+        stageId: this.stageId,
+        bondAvailable: (bondId, team) => this.bondLive(bondId, team),
+        itemAvailable: (id) => this.itemPool.canGain(id),
+      });
+      if (!pair) { this.beforePrepOffers(); return; }
       cards = [];
       teams = new Map();
-      for (const team of this.matchTeamIds()) {
-        const d = this.spDraw(team);
-        if (!d) continue;
+      this.matchTeamIds().forEach((team, i) => {
+        const list = pair.teams[i] || [];
         const base = cards.length;
-        for (const [i, c] of d.cards.entries()) cards.push({ ...c, idx: base + i, poolTeam: team });
-        teams.set(team, { family: d.family, name: d.name, desc: d.desc, eventId: d.eventId });
-      }
+        list.forEach((c, j) => cards.push({ ...c, idx: base + j, poolTeam: team }));
+        teams.set(team, { family: pair.family, name: pair.name, desc: pair.desc, eventId: pair.eventId });
+      });
       if (!cards.length) { this.beforePrepOffers(); return; }
     } else {
       const d = this.spDraw(null);
@@ -76,16 +83,14 @@ export class MatchSpDraft {
   }
 
   /**
-   * One 机变 draw (choices.js generateDraft): the shared one for solo/co-op, one per team in 2V2 (VERSUS_SP_CARDS each,
-   * from that team's own live bonds — a 驰援 card of a bond only the opponent can use must not appear).
-   * @param {number|null} team
+   * One shared 机变 draw (choices.js generateDraft) for solo/co-op. 2V2 uses generateVersusDrafts instead: one family
+   * for both teams and two fixed-gradient boards (see enterSpDraft).
    */
-  spDraw(team) {
+  spDraw() {
     return generateDraft(this.gd, this.rngDraft, this.round, {
       stageId: this.stageId,
-      bondAvailable: (bondId) => this.bondLive(bondId, team),
+      bondAvailable: (bondId) => this.bondLive(bondId),
       itemAvailable: (id) => this.itemPool.canGain(id),
-      cardCount: this.isVersus ? VERSUS_SP_CARDS : null,
     });
   }
 

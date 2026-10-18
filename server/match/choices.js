@@ -141,7 +141,7 @@ export function generateDraft(gd, rng, round, { stageId = null, bondAvailable = 
   const sch = scheduleFor(gd, round);
   const fams = Array.isArray(sch.families) && sch.families.length ? sch.families.map((f) => [f.family, f.weight]) : [['supply', 1]];
   let family = weightedPick(rng, fams) || 'supply';
-  // 2V2 ('versus'): the 机变 draft offers 3 cards instead of 6 (the user's rule; `cardCount` wins over the schedule)
+  // `cardCount` overrides the schedule (tests / special draws); the 2V2 mode uses generateVersusDrafts instead.
   const n = Number.isInteger(cardCount) && cardCount > 0 ? Math.min(cardCount, 6)
     : (Number.isInteger(sch.cards) && sch.cards > 0 ? Math.min(sch.cards, 6) : formatCount(gd));
   const opts = { stageId, bondAvailable, round, itemAvailable };
@@ -367,7 +367,8 @@ export function tacticCard(c) {
  * Terrain cards only for the match stage; a card whose every target bond is dead in this match (mode-inactive, or no
  * chess left in the pool: `bondAvailable`) is never offered.
  */
-export function tacticDraftCards(gd, rng, n, { stageId = null, bondAvailable = null, round = null } = {}) {
+/** The 战术决策 pool / weighted pairs for a match (shared by the solo/co-op draw and the 2V2 pair below). */
+function tacticPool(gd, { stageId = null, bondAvailable = null, round = null } = {}) {
   const bondOk = (c) => {
     if (typeof bondAvailable !== 'function') return true;
     const bonds = cardTargetBonds(gd, c.effectId);
@@ -381,6 +382,18 @@ export function tacticDraftCards(gd, rng, n, { stageId = null, bondAvailable = n
   const w = official && spec.weights && typeof spec.weights === 'object' ? spec.weights : {};
   const ofKinds = kinds ? pool.filter((c) => kinds.includes(c.kind)) : pool;
   const pairs = (ofKinds.length ? ofKinds : pool).map((c) => [c, Object.hasOwn(w, c.effectId) ? w[c.effectId] : 1]);
+  return { pool, pairs };
+}
+
+/**
+ * The 战术决策 cards (module header): `n` cards, each drawn on its own — with replacement, so one card can fill two places
+ * (official R11 of match 7: 补给 ×2). At the rounds of choices.json `tacticDraft` (`rounds`; R11) only the cards of its
+ * `kinds` (ally), each by `weights` (1 when unlisted); elsewhere — or when those kinds leave nothing — every card, uniform.
+ * Terrain cards only for the match stage; a card whose every target bond is dead in this match (mode-inactive, or no
+ * chess left in the pool: `bondAvailable`) is never offered.
+ */
+export function tacticDraftCards(gd, rng, n, opts = {}) {
+  const { pairs } = tacticPool(gd, opts);
   const out = [];
   for (let i = 0; i < n && pairs.length; i++) out.push(tacticCard(weightedPick(rng, pairs)));
   return out;
@@ -406,6 +419,132 @@ function buildCards(gd, rng, family, n, sch, { stageId = null, bondAvailable = n
   }
   if (family === 'tactic') return tacticDraftCards(gd, rng, n, { stageId, bondAvailable, round });
   return [];
+}
+
+// ---- 2V2 机变: two team boards with the SAME family and a fixed tier gradient ------------------------------------
+/** Cards each team gets in the 2V2 机变 (one player picks one; the shop family keeps its own 3-card official draw). */
+export const VERSUS_TEAM_CARDS = 4;
+export const VERSUS_SHOP_CARDS = 3;
+
+const bountyTierOf = (c) => Math.max(1, Math.min(3, Number(c && c.tier) || 1));
+
+/** A 2V2 悬赏决策 board: eight distinct cards, I×4 / II×2 / III×2 → each team I×2 / II×1 / III×1. */
+function bountyVersusPair(gd, rng, round, sch) {
+  const kind = typeof sch.bountyDraft === 'string' ? sch.bountyDraft : bountyDraftKind(round);
+  const all = Array.isArray(gd.choices.cards && gd.choices.cards.bounty) ? gd.choices.cards.bounty : [];
+  const eligible = all.filter((c) => c && draftBounty(c, kind) && gd.enemy(c.enemyKey));
+  if (!eligible.length) return null;
+  const picked = [];
+  for (const [tier, count] of [[3, 2], [2, 2], [1, 4]]) {
+    const list = rng.shuffle(eligible.filter((c) => bountyTierOf(c) === tier && !picked.includes(c)));
+    picked.push(...list.slice(0, count));
+  }
+  if (picked.length < 8) {
+    const rest = rng.shuffle(eligible.filter((c) => !picked.includes(c)));
+    picked.push(...rest.slice(0, 8 - picked.length));
+  }
+  const a = [];
+  const b = [];
+  for (const tier of [3, 2, 1]) {
+    const list = rng.shuffle(picked.filter((c) => bountyTierOf(c) === tier));
+    list.forEach((c, i) => (i % 2 ? b : a).push(c));
+  }
+  while (a.length > VERSUS_TEAM_CARDS) b.push(a.pop());
+  while (b.length > VERSUS_TEAM_CARDS) a.push(b.pop());
+  return { teams: [rng.shuffle(a.map((c) => bountyCard(gd, c))), rng.shuffle(b.map((c) => bountyCard(gd, c)))] };
+}
+
+/** A 2V2 道具补给 board: each team lo×2 / mid×1 / hi×1, items drawn with replacement (official supply). */
+function supplyVersusPair(gd, rng, sch, itemAvailable) {
+  let lo = 1;
+  let hi = 6;
+  if (Array.isArray(sch.supplyTiers) && sch.supplyTiers.length === 2) [lo, hi] = sch.supplyTiers;
+  lo = Math.max(1, Math.min(6, Number(lo) || 1));
+  hi = Math.max(lo, Math.min(6, Number(hi) || 6));
+  const mid = Math.max(lo, Math.min(hi, Math.round((lo + hi) / 2)));
+  const tiers = [lo, lo, mid, hi];
+  const draw = (tier) => {
+    let list = eligibleItems(gd, tier, tier);
+    if (itemAvailable) list = list.filter(itemAvailable);
+    if (!list.length) {
+      list = eligibleItems(gd, lo, hi);
+      if (itemAvailable) list = list.filter(itemAvailable);
+    }
+    if (!list.length) list = eligibleItems(gd, 1, 6);
+    return list.length ? itemCard(gd, list[Math.floor(rng() * list.length)]) : null;
+  };
+  const a = tiers.map(draw);
+  const b = tiers.map(draw);
+  if (a.some((c) => !c) || b.some((c) => !c)) return null;
+  return { teams: [rng.shuffle(a), rng.shuffle(b)] };
+}
+
+/** A 2V2 战术决策 board: each team two team-wide + two personal cards, drawn by the official weights. */
+function tacticVersusPair(gd, rng, opts) {
+  const drawTeam = (team) => {
+    const bondAvailable = typeof opts.bondAvailable === 'function'
+      ? (bondId) => opts.bondAvailable(bondId, team)
+      : null;
+    let { pairs } = tacticPool(gd, { ...opts, bondAvailable });
+    if (!pairs.length) ({ pairs } = tacticPool(gd, { ...opts, bondAvailable: null }));
+    if (!pairs.length) return [];
+    const teamPairs = pairs.filter(([c]) => c.team);
+    const personalPairs = pairs.filter(([c]) => !c.team);
+    const groups = [teamPairs.length ? teamPairs : pairs, personalPairs.length ? personalPairs : pairs];
+    const out = [];
+    for (const list of groups) for (let i = 0; i < 2; i++) out.push(tacticCard(weightedPick(rng, list)));
+    return rng.shuffle(out);
+  };
+  const a = drawTeam(0);
+  const b = drawTeam(1);
+  return a.length && b.length ? { teams: [a, b] } : null;
+}
+
+/** One family's two 4-card boards (shop: its unchanged 3-card official draw, one per team). */
+function buildVersusPair(gd, rng, family, round, sch, opts) {
+  if (family === 'bounty') return bountyVersusPair(gd, rng, round, sch);
+  if (family === 'supply') return supplyVersusPair(gd, rng, sch, opts.itemAvailable);
+  if (family === 'tactic') return tacticVersusPair(gd, rng, { stageId: opts.stageId, bondAvailable: opts.bondAvailable, round });
+  if (family === 'shop') {
+    const a = shopDraftCards(gd, rng, VERSUS_SHOP_CARDS, round, opts.itemAvailable);
+    const b = shopDraftCards(gd, rng, VERSUS_SHOP_CARDS, round, opts.itemAvailable);
+    return a && b ? { teams: [a, b] } : null;
+  }
+  return null;
+}
+
+/**
+ * The 2V2 机变 draw (the user's rule, 2026-10-18): ONE family roll for both teams, and two boards with the same fixed
+ * composition so neither side can draw a better gradient than the other:
+ *   bounty  I×2 + II×1 + III×1 per team (eight distinct cards; the official 6-card I×3/II×2/III×1 doubled);
+ *   supply  lo×2 + mid×1 + hi×1 per team (item tiers, duplicates allowed);
+ *   tactic  2 team-wide + 2 personal per team (official weights, duplicates allowed);
+ *   shop    unchanged: the official slot draw, 3 cards per team (the user: 商店不动).
+ * Each player still picks ONE card; a team takes 2 of its 4 (shop: 2 of 3). The opponent's board stays hidden.
+ * @returns {{ family: string, name: string, desc: string, eventId: string|null, teams: any[][] } | null}
+ */
+export function generateVersusDrafts(gd, rng, round, { stageId = null, bondAvailable = null, itemAvailable = null } = {}) {
+  const sch = scheduleFor(gd, round);
+  const fams = Array.isArray(sch.families) && sch.families.length ? sch.families.map((f) => [f.family, f.weight]) : [['supply', 1]];
+  let family = weightedPick(rng, fams) || 'supply';
+  const opts = { stageId, bondAvailable, itemAvailable };
+  let pair = buildVersusPair(gd, rng, family, round, sch, opts);
+  if (!pair && family !== 'supply') {
+    family = 'supply';
+    pair = buildVersusPair(gd, rng, family, round, sch, opts);
+  }
+  if (!pair) return null;
+  pair.teams.forEach((list) => list.forEach((c) => { c.family = family; }));
+  const famInfo = gd.choices.families && gd.choices.families[family];
+  const events = sch.events && Array.isArray(sch.events[family]) ? sch.events[family] : [];
+  const eventId = events.length ? events[Math.floor(rng() * events.length)] : null;
+  return {
+    family,
+    name: famInfo && famInfo.name ? famInfo.name : FAMILY_NAMES[family] || family,
+    desc: famInfo && famInfo.desc ? famInfo.desc : '',
+    eventId,
+    teams: pair.teams,
+  };
 }
 
 /** Public card view. */

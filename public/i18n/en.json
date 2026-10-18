@@ -2470,5 +2470,6 @@
   "中性": "Neutral",
   "不利": "Unfavourable",
   "选择「自己」时所有数值 ×2；连续数值按 1 + (基础 − 1) × 2 计算。": "Choosing Self doubles every value; continuous values use 1 + (base − 1) × 2.",
-  "本回合的敌人": "This round's enemies"
+  "本回合的敌人": "This round's enemies",
+  "本队已选 {n}/{total}": "Your team has picked {n}/{total}"
 }

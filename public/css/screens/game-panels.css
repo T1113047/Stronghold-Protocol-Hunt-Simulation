@@ -419,6 +419,11 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   .gm.has-spdraft .spov__grid { gap: .46rem .6rem; padding: .14rem .1rem 0 .06rem; }
 }
 .spov__grid--3 { grid-template-columns: repeat(3, minmax(0, 4.3rem)); grid-template-rows: minmax(0, 4.6rem); justify-content: center; align-content: start; gap: .36rem; margin-top: .3rem; }
+/* 2V2 机变: four cards per team (one pick each) — one wide row on a desktop, 2×2 on short/narrow screens */
+.spov__grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: minmax(0, 4.6rem); align-content: start; gap: .24rem; margin-top: .12rem; }
+@media (max-width: 900px) {
+  .spov__grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: .12rem; }
+}
 .spov__grid--3 .spcard__icon { width: 1.3rem; height: 1.3rem; }
 /* The official card (research 06 §11.5; the official 悬赏 / 机密商店 / 战术 screenshots): a framed icon at the top-left
    with the bold name beside it, the effect text under both across the card, left-aligned; the tier chip on the icon's

@@ -9,6 +9,7 @@ import { makeMatch, DATA } from './harness.js';
 import { PHASE, ERR, VERSUS_CONFRONT, teamOfSeat, VERSUS_LOW_LP, VERSUS_INFO_SECONDS, opponentRevealed } from '../../shared/constants.js';
 import { confrontPool } from '../../server/match/match/confront.js';
 import { buildNormalWave } from '../../server/match/waves.js';
+import { generateVersusDrafts } from '../../server/match/choices.js';
 import { validateC2S } from '../../shared/protocol.js';
 
 /** 4 seats laid out as two teams of two (0,1 → team 0; 2,3 → team 1). */
@@ -231,8 +232,8 @@ describe('versus (2V2) match: team model', () => {
     }
   });
 
-  test('versus: the 机变 draft gives EACH TEAM its own 3 cards (the two teams take turns)', () => {
-    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 31, fake: true }).start();
+  test('versus: the 机变 draft gives EACH TEAM its own 4 cards with the same graded pool (the two teams take turns)', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'HARD', seats: vsSeats(), seed: 31, fake: true }).start();
     const m = h.m;
     assert.ok([4, 5, 6].includes(m.contestStartRound), `contestStartRound ${m.contestStartRound}`);
     assert.ok(h.lastTo('p_0', 'm.public')?.contestStartRound === m.contestStartRound, 'published in m.public');
@@ -245,14 +246,20 @@ describe('versus (2V2) match: team model', () => {
     assert.ok(seen, 'reached an 机变 draft');
     const s = m.sp;
     const poolOf = (t) => s.cards.filter((c) => c.poolTeam === t);
-    assert.equal(poolOf(0).length, 3, 'team 0 is offered its own 3 cards');
-    assert.equal(poolOf(1).length, 3, 'team 1 is offered its own 3 cards');
-    assert.equal(s.cards.length, 6, 'the two pools together hold 6 cards');
+    assert.equal(poolOf(0).length, 4, 'team 0 is offered its own 4 cards');
+    assert.equal(poolOf(1).length, 4, 'team 1 is offered its own 4 cards');
+    assert.equal(s.cards.length, 8, 'the two pools together hold 8 cards');
+    // both sides rolled the same family and the same fixed gradient: I×2 + II×1 + III×1
+    assert.equal(s.teams.get(0).family, s.teams.get(1).family, 'one family for both teams');
+    const tiers = (list) => list.map((c) => c.tier).sort();
+    assert.deepEqual(tiers(poolOf(0)), [1, 1, 2, 3], "team 0's tiers");
+    assert.deepEqual(tiers(poolOf(1)), [1, 1, 2, 3], "team 1's tiers");
+    assert.equal(new Set(s.cards.map((c) => c.id)).size, 8, 'the two boards never share a card');
     // the two teams take turns: a member of each, slot by slot
     assert.deepEqual(s.order.map((pid) => m.teamIdOf(m.players.get(pid))), [0, 1, 0, 1]);
     // a seat may only pick from its OWN team's pool
     const own = m.spCardsFor(m.players.get('p_0'));
-    assert.equal(own.length, 3);
+    assert.equal(own.length, 4);
     assert.ok(own.every((c) => c.poolTeam === 0), "p_0's pool holds its own team's cards only");
     const oppIdx = poolOf(1)[0].idx;
     assert.ok(m.pickCard(m.players.get('p_0'), oppIdx).error, 'taking the other team\'s card is refused');
@@ -265,6 +272,46 @@ describe('versus (2V2) match: team model', () => {
     if (v0.turn == null) assert.equal(v0.waiting, true, 'the waiting team says so');
     if (v1.turn == null) assert.equal(v1.waiting, true, 'the waiting team says so');
     assert.deepEqual(h.logs.error, [], 'no engine errors');
+  });
+
+  test('versus: the 机变 generator keeps one family and a fixed gradient (bounty I×2/II×1/III×1, shop 3 unchanged)', () => {
+    const m = makeMatch({ mode: 'versus', difficulty: 'HARD', seats: vsSeats(), seed: 71, fake: true }).start().m;
+    const opts = {
+      stageId: m.stageId,
+      bondAvailable: (bondId, team) => m.bondLive(bondId, team),
+      itemAvailable: (id) => m.itemPool.canGain(id),
+    };
+    const tiers = (list) => {
+      const out = {};
+      for (const c of list) out[c.tier] = (out[c.tier] || 0) + 1;
+      return out;
+    };
+    let bounties = 0;
+    for (let i = 0; i < 60; i++) {
+      const round = [3, 9, 11][i % 3];
+      const d = generateVersusDrafts(m.gd, m.rngDraft, round, opts);
+      assert.ok(d && d.teams.length === 2, `round ${round}: two boards`);
+      const [a, b] = d.teams;
+      if (d.family === 'shop') {
+        assert.equal(a.length, 3, 'the 机密商店 keeps its official 3-card draw');
+        assert.equal(b.length, 3);
+        continue;
+      }
+      assert.equal(a.length, 4, `round ${round} (${d.family}): team 0 four cards`);
+      assert.equal(b.length, 4, `round ${round} (${d.family}): team 1 four cards`);
+      if (d.family === 'bounty') {
+        bounties++;
+        assert.deepEqual(tiers(a), { 1: 2, 2: 1, 3: 1 }, 'team 0: two I, one II, one III');
+        assert.deepEqual(tiers(b), { 1: 2, 2: 1, 3: 1 }, 'team 1: two I, one II, one III');
+        assert.equal(new Set([...a, ...b].map((c) => c.id)).size, 8, 'the two bounty boards never share a card');
+      }
+      if (d.family === 'tactic') {
+        assert.equal(a.filter((c) => c.team).length, 2, 'team 0: two team-wide tactics');
+        assert.equal(b.filter((c) => c.team).length, 2, 'team 1: two team-wide tactics');
+      }
+    }
+    assert.ok(bounties > 0, 'R3 is a bounty round');
+    assert.deepEqual(m.logs?.error || [], [], 'no engine errors');
   });
 
   test('versus: development compensation grants a 小电话 from the contest round', () => {

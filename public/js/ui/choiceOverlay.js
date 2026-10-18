@@ -205,6 +205,9 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           <p class="spov__sub">${timed ? (personal ? t('休整期结束时未选择将自动选定') : t('倒计时结束后仍未选定将自动分配')) : t('选择一项（无时间限制）')}${mine == null && myTurn ? t(' · 点击卡牌选中，再次点击确认') : ''}</p>
         </div>
         <div class="spov__turn">
+          ${sp.order.length === 2 && sp.cards.length <= 4
+            ? html`<span class="spov__turntxt t-dim">${t('本队已选 {n}/{total}', { n: sp.pickOf ? sp.pickOf.size : 0, total: sp.order.length })}</span>`
+            : null}
           ${personal ? html`<span class="spov__turntxt is-mine">${t('从候选中选择一项战术特训')}</span>`
             : sp.waiting ? html`<span class="spov__turntxt"><${Icon} name="hourglass" />${t('等待对面一队选择')}</span>`
             : mine != null ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />${t('已完成选择')}</span>`
@@ -215,7 +218,7 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
           ${timed ? html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />` : null}
         </div>
       </header>
-      <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3')}>
+      <div class=${cx('spov__grid', sp.cards.length <= 3 && 'spov__grid--3', sp.cards.length === 4 && 'spov__grid--4')}>
         ${sp.cards.map((card) => {
           const r = resolveSpCard(card, sp.family);
           const taker = card.takenBy ? players.get(card.takenBy) : null;
