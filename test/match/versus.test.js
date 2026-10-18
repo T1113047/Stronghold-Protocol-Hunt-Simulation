@@ -274,8 +274,13 @@ describe('versus (2V2) match: team model', () => {
     assert.deepEqual(h.logs.error, [], 'no engine errors');
   });
 
-  test('versus: the 机变 generator keeps one family and a fixed gradient (bounty I×2/II×1/III×1, shop 3 unchanged)', () => {
-    const m = makeMatch({ mode: 'versus', difficulty: 'HARD', seats: vsSeats(), seed: 71, fake: true }).start().m;
+  test('versus: g.choice accepts both teams\' global card indexes (4–7), not only the old 0–5', () => {
+    for (const idx of [0, 5, 6, 7]) assert.equal(validateC2S({ t: 'g.choice', idx }), null, `idx ${idx}`);
+    assert.equal(typeof validateC2S({ t: 'g.choice', idx: 8 }), 'string', 'idx 8 is outside the 8-card draft');
+    assert.equal(typeof validateC2S({ t: 'g.choice', idx: -1 }), 'string');
+  });
+
+  test('versus: the 机变 generator keeps one family and a fixed gradient (bounty I×2/II×1/III×1, shop 3 unchanged)', () => {    const m = makeMatch({ mode: 'versus', difficulty: 'HARD', seats: vsSeats(), seed: 71, fake: true }).start().m;
     const opts = {
       stageId: m.stageId,
       bondAvailable: (bondId, team) => m.bondLive(bondId, team),
