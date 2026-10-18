@@ -156,6 +156,26 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 > 该接口只对**本机回环**开放：局域网/公网访问 `/api/update/*` 一律 404。需要远程操作时用 SSH 隧道把 3001 映射到本机。
 > 如果服务器装了本地补丁（例如账号/成就），可以在 systemd 里设置 `SP_UPDATE_PATCH_CMD`，更新器会在重启前自动执行补丁脚本（例如 `/root/patches/hunt-account-ach/apply.sh --no-restart`）。
 
+#### Forge / 插件策略（只做本地端）
+
+本服只接受**外观**与**本地界面**类插件。每台服务器自己的 `plugins/config.json`（`.gitignore` 里的 `plugins/*`，不随仓库发布）：
+
+```json
+{
+  "rooms": "host",
+  "default": [],
+  "allow": ["*"],
+  "classes": { "cosmetic": true, "content": false },
+  "limits": { "maxSets": 0 },
+  "allowIncompatible": false
+}
+```
+
+- `cosmetic`（立绘 / 模型 / 语音 / 皮肤 / 音频）与 `ui`（本地界面小组件）可用；
+- `content`（数值 / 干员 / 敌人 / 模式）关闭；`maxSets: 0` 保证房间永远拿不到内容集；
+- `script` / `trusted` 不设置 `SP_PLUGIN_SCRIPTS`，永不执行；
+- Forge 包照常导入并生成报告，但带 `kits/`、`numbers/` 的包**不会改变玩法**，只有换皮/换语音/挂面板生效。
+
 #### 用整合包安装的：更新包
 
 0.2.1 起，Releases 里每个版本除了完整包和精简包，还有更新包 `Stronghold-Protocol-v<版本>-update.zip`：只含比说明中列出的旧版本改动过的文件（程序、数据、运行依赖，以及改动过的素材），通常只有几 MB。它用来升级用 0.2.0 及以后的完整包或精简包装好的文件夹（适用的版本写在 Releases 说明里）；全新安装、0.1.x 和 GitHub「Download ZIP」源码包请用完整包或精简包，`git clone` 的用上面的 `git pull`。
