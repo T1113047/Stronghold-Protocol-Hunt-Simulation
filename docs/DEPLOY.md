@@ -153,6 +153,8 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 - `plugins/`、账号数据、素材、缓存、`.studio-key` 永不触碰；
 - 服务器由 systemd 托管（`Restart=always`）时更新后自动重启；否则面板提示手动重启；更新会结束当前对局。
 
+> GitHub API 未登录时每小时 60 次（共享 IP 可能被限流，返回 403）；可在 systemd 里设置只读的 `SP_UPDATE_TOKEN`（GitHub fine-grained token，公开仓库读权限）解除限流。
+>
 > 该接口只对**本机回环**开放：局域网/公网访问 `/api/update/*` 一律 404。需要远程操作时用 SSH 隧道把 3001 映射到本机。
 > 如果服务器装了本地补丁（例如账号/成就），可以在 systemd 里设置 `SP_UPDATE_PATCH_CMD`，更新器会在重启前自动执行补丁脚本（例如 `/root/patches/hunt-account-ach/apply.sh --no-restart`）。
 

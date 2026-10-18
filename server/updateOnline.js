@@ -102,6 +102,8 @@ export function createUpdater({ appDir, log, currentVersion = APP_VERSION, forkV
   let cache = null;
   let running = false;
   const headers = { 'user-agent': 'hunt-simulation-updater', accept: 'application/vnd.github+json' };
+  // GitHub's unauthenticated limit is 60 requests an hour per IP; a read-only token raises it (optional)
+  if (process.env.SP_UPDATE_TOKEN) headers.authorization = 'Bearer ' + process.env.SP_UPDATE_TOKEN;
   const listUrl = () => apiUrl.replace(/\/releases\/latest\/?$/, '/releases?per_page=30');
 
   const current = () => ({ app: currentVersion, fork: forkVersion });
@@ -109,7 +111,7 @@ export function createUpdater({ appDir, log, currentVersion = APP_VERSION, forkV
   async function getJson(url) {
     if (!fetchImpl) throw new Error('fetch unavailable');
     const res = await fetchImpl(url, { headers });
-    if (!res.ok) throw new Error('GitHub ' + res.status);
+    if (!res.ok) throw new Error('GitHub ' + res.status + (res.status === 403 ? '（限流；可设置 SP_UPDATE_TOKEN）' : ''));
     return res.json();
   }
 
