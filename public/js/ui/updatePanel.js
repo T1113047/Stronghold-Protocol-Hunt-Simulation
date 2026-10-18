@@ -4,7 +4,7 @@
 // 两种包：更新包（只覆盖 UPDATE.json.from 里的版本，不允许跨版本）与精简包（可跨版本）。
 import { html, Button, MicroLabel } from './components.js';
 import { useEffect, useState } from '../../vendor/hooks.module.js';
-import { t } from './lang.js';
+import { t } from '../../../shared/i18n.js';
 
 /** Compare two dotted versions; >0 when a is newer. */
 function cmp(a, b) {
