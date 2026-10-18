@@ -1009,8 +1009,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .confclash__p { position: absolute; right: .02rem; bottom: 0; font-size: .14rem; font-weight: 700; padding: 0 .04rem; background: rgba(8, 11, 10, .9); }
 .confclash__side--blue .confclash__p { color: #8cc6ff; }
 .confclash__side--red .confclash__p { color: #ffab97; }
-.confclash__mid { display: flex; align-items: center; gap: .04rem; flex-wrap: wrap; max-width: 2.4rem; justify-content: center; }
+.confclash__mid { display: flex; align-items: center; gap: .04rem; flex-wrap: wrap; max-width: min(10.2rem, 62vw); justify-content: center; }
 .confclash__mid img { width: .36rem; height: .36rem; object-fit: contain; }
+.confclash__more { flex: none; padding: 0 .04rem; font-size: calc(.12 * var(--t)); font-weight: 800; color: var(--text-md); }
 .confclash__vs { font-size: .46rem; font-weight: 700; color: var(--orange-hi); animation: clashHit 5.2s ease both; }
 .confclash .confclash__coin { font-size: calc(.14 * var(--t)); font-weight: 700; color: var(--gold); white-space: nowrap; }
 /* The seat / source line (P1 / P2 …, "P1 已选择", the P label of a bounty row): one step BELOW body text, always a

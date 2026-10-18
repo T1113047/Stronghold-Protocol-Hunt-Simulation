@@ -87,7 +87,7 @@ export function roundBuffRows(pub, myId) {
 export function RoundBuffs({ pub, myId }) {
   const rows = roundBuffRows(pub, myId);
   return html`<div class="rbuffs" data-testid="round-buffs">
-    <div class="rbuffs__title">${t('本回合词条')}</div>
+    <div class="rbuffs__title">${t('本期事件词条')}</div>
     ${rows.length
       ? rows.map((r, i) => html`<button key=${`${r.kind}:${i}`} type="button"
           class=${`rbuff rbuff--${r.kind} rbuff--${(r.detail && r.detail.tone) || 'mint'}`}

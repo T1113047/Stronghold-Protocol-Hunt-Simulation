@@ -22,6 +22,8 @@ import { VERSUS_CONFRONT } from '../../../shared/constants.js';
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 // module-level, so the labels are msgids (N_) and translated where they are shown (t(label))
 const POSITIONS = [['front', N_('靠前')], ['mid', N_('靠中')], ['back', N_('靠后')]];
+/** Bounty rows show every placed monster up to this many; the rest collapse into a +N chip. */
+const MAX_BOUNTY_ICONS = 25;
 /**
  * A 特训敌人 type's short label: the data name is 特训敌人·隐匿, the shown label drops the translated prefix (the same
  * expression the enemy drawer's faction chips use).
@@ -52,13 +54,16 @@ function clashRowBody(gd, players, r) {
   const side = (p) => (p && p.team === 1 ? 'red' : 'blue');
   const foe = players.find((p) => p.playerId === r.sub.target) || null;
   const picks = Array.isArray(r.sub.picks) ? r.sub.picks : [];
+  const shown = picks.slice(0, MAX_BOUNTY_ICONS);
+  const rest = picks.length - shown.length;
   return html`<div class="confclash__row" data-testid="confront-clash-row">
     <span class=${cx('confclash__side', `confclash__side--${side(r.atk)}`)}>
       <${PlayerAvatar} player=${r.atk} size="sm" />
       <span class="confclash__p confseat num">${pNoOf(r.atk)}</span>
     </span>
     <span class="confclash__mid">
-      ${picks.slice(0, 8).map((pk, i) => html`<${Img} key=${`${pk.enemyKey}:${i}`} src=${enemyIconUrl(gd.m, pk.enemyKey)} fallback=${html`<${GIcon} name="target" />`} />`)}
+      ${shown.map((pk, i) => html`<${Img} key=${`${pk.enemyKey}:${i}`} src=${enemyIconUrl(gd.m, pk.enemyKey)} fallback=${html`<${GIcon} name="target" />`} />`)}
+      ${rest > 0 ? html`<span class="confclash__more num">+${rest}</span>` : null}
       <span class="confclash__vs">→</span>
     </span>
     <span class=${cx('confclash__side', `confclash__side--${side(foe)}`)}>

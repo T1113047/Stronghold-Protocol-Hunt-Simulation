@@ -610,7 +610,7 @@
    line and a coloured left mark matching the entry's kind — the same language as the teammate rows above. Every row is a
    button: the icon names the class, the dotted underline says "open me", and the 说明 popup (ui/entryDetail.js) carries
    the full effect and its maths. Text sizes read --t (a readable size); long lines truncate instead of wrapping. */
-.rbuffs { display: flex; flex-direction: column; gap: .02rem; align-self: flex-start; max-width: min(2.4rem, 72vw); }
+.rbuffs { display: flex; flex-direction: column; gap: .02rem; align-self: flex-start; max-width: min(4.4rem, 92vw); }
 .rbuff {
   display: block; width: 100%; max-width: 100%; margin: 0; padding: .02rem .06rem;
   background: rgba(8, 11, 10, .72); border: 1px solid var(--line); border-left: 2px solid var(--amber);

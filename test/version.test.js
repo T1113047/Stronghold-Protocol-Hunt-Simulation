@@ -26,11 +26,11 @@ test('one release version: this fork\'s 0.0.1 everywhere, the upstream 0.3.1 bes
   assert.match(APP_VERSION, /^\d+\.\d+\.\d+(-dev)?$/);
   assert.equal(DEV_BUILD, APP_VERSION.endsWith('-dev'));
   // the version a player or a host reads is THIS fork's (shared/constants.js FORK_VERSION), not the upstream release
-  assert.equal(FORK_VERSION, 'V0.0.2');
+  assert.equal(FORK_VERSION, 'V0.0.3');
   assert.ok(FORK_LABEL.includes(FORK_VERSION) && FORK_LABEL.includes(APP_VERSION), 'the fork label pairs its own number with the upstream release');
-  assert.equal(pkg.version, '0.0.2');
-  assert.equal(lock.version, '0.0.2');
-  assert.equal(lock.packages[''].version, '0.0.2');
+  assert.equal(pkg.version, '0.0.3');
+  assert.equal(lock.version, '0.0.3');
+  assert.equal(lock.packages[''].version, '0.0.3');
   assert.equal(pkg.upstream, APP_VERSION, 'package.json names the upstream release it is built on');
   assert.equal(PROTOCOL_VERSION, 1, 'the wire protocol number is separate from the release version');
   assert.equal(pkg.private, true, 'never published to npm');
@@ -40,7 +40,7 @@ test('CHANGELOG.md opens with this fork\'s entry, keeps the upstream releases be
   const log = read('CHANGELOG.md');
   // the fork's own entry first: FORK_VERSION beside the upstream release it is built on; the upstream releases stay below
   const top = log.split('\n')[0];
-  assert.match(top, /^## V0\.0\.2/, `the fork's entry opens the file: ${top}`);
+  assert.match(top, /^## V0\.0\.3/, `the fork's entry opens the file: ${top}`);
   assert.match(top, /0\.3\.1/, 'it names the upstream release it is built on');
   const first = log.match(/^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})/m);
   assert.ok(first, 'a "## x.y.z — date" heading');
@@ -79,7 +79,7 @@ test('this fork names itself: README title and badges, package name, repository 
   // the README carries both badges: the upstream release this fork is built on, and the fork's own number
   // (shields.io shows the full-width parentheses of a badge label verbatim)
   assert.match(readme, /badge\/version-0\.3\.1-/, 'the upstream release badge stays on the README');
-  assert.match(readme, /badge\/fork-V0\.0\.2（0\.3\.1）-/, 'the fork\'s own badge');
+  assert.match(readme, /badge\/fork-V0\.0\.3（0\.3\.1）-/, 'the fork\'s own badge');
   assert.equal(pkg.name, PKG_NAME);
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.packages[''].name, pkg.name);
