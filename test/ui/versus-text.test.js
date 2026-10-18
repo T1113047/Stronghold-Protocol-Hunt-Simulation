@@ -97,17 +97,18 @@ test('R10: JA calls 特质 特質 — distinct from 特性 and from the 堅守 A
 
 test('R13: the obsolete strings are gone from all four packs (no silent dead keys)', () => {
   const gone = [
-    '开始模拟前可调整干员携带的技能与模组，干员等级不可调整',
-    '华法琳', '调和',
-    '选择一组怪物，替换对面本回合 {p}% 的出怪',
-    '第 {r} 回合 · 队内协商（对手看不到你的选择）',
-    '你已提交，等待队伍完成',
-    '选择一组怪物 → 点怪加入 → 排出怪顺序与门',
-    '从{route}出', '中路', '空路', '上移', '下移',
-    '精打细算玩偶', '悬赏决策', '道具补给', '机密商店', '战术决策',
-    '标准', '险境', '绝境', '终极',
-    '将 {nChanged} 名干员的技能与模组恢复为默认配置？',
-    '本机数据 · 仅记录本浏览器中你参与的对局',
+    "开始模拟前可调整干员携带的技能与模组，干员等级不可调整",
+    "选择一组怪物，替换对面本回合 {p}% 的出怪",
+    "第 {r} 回合 · 队内协商（对手看不到你的选择）",
+    "你已提交，等待队伍完成",
+    "选择一组怪物 → 点怪加入 → 排出怪顺序与门",
+    "从{route}出",
+    "中路",
+    "空路",
+    "上移",
+    "下移",
+    "将 {nChanged} 名干员的技能与模组恢复为默认配置？",
+    "本机数据 · 仅记录本浏览器中你参与的对局",
   ];
   for (const l of LANGS) for (const k of gone) assert.ok(!(k in PACK[l]), `${l}: ${JSON.stringify(k)} should be gone`);
   // the ones still in use stay

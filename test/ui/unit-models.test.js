@@ -53,6 +53,8 @@ test('[PREFETCH] installOpPrefetch warms an avatar + the battle Spine, de-duped,
     installOpPrefetch({ store });
     assert.deepEqual([preloaded.length, acquired.length], [0, 0], 'nothing before a piece shows up');
     store.set({ match: { private: { hand: [{ id: 'char_002_amiya', kind: 'chess' }] }, field: null } });
+    // assets.js is imported lazily now: wait a macrotask, not just microtasks
+    await new Promise((r) => setTimeout(r, 0));
     for (let i = 0; i < 4; i++) await Promise.resolve();
     assert.deepEqual(preloaded, ['/assets/avatars/char_002_amiya.png']);
     assert.deepEqual(acquired, ['/assets/spine/amiya/Front.skel']);

@@ -211,6 +211,7 @@ export function normalizeChess(rec) {
     talents,
     tokens: rec.tokens ?? [],
     spine: rec.assets?.spine ?? rec.spine ?? rec.charId ?? null,
+    ...(rec.assets?.voice ? { voice: rec.assets.voice } : {}),
     avatar: rec.assets?.avatar ?? rec.avatar ?? rec.charId ?? null,
     // a 补位 stand-in (shared/standIn.js): the replaced operator's charId — `charId` is the stand-in's (absent otherwise)
     ...(rec.standInFor ? { standInFor: rec.standInFor } : null),
@@ -430,7 +431,7 @@ function portalAppear(cps) {
   for (let i = 0; i < cps.length; i++) {
     if (cps[i].type !== 'DISAPPEAR') continue;
     let j = i + 1;
-    while (j < cps.length && cps[j].type === 'WAIT') j++;
+    while (j < cps.length && cps[j].type === 'WAIT') j++; // loop-cap: checkpoint index
     if (cps[j] && cps[j].type === 'MOVE') cps.splice(j, 0, { type: 'APPEAR', pos: cps[j].pos.slice(), time: 0 });
   }
 }

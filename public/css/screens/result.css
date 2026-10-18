@@ -181,12 +181,15 @@
 .rstat { display: flex; align-items: baseline; justify-content: space-between; gap: max(.04rem, 2px); padding: max(.04rem, 2px) max(.08rem, 3px); background: #0e1210; box-shadow: 0 0 0 1px var(--line); font-size: max(calc(.11 * var(--t)), 7px); color: var(--text-lo); white-space: nowrap; min-width: 0; }
 .rstat b { font-size: max(calc(.15 * var(--t)), 9px); color: #fff; }
 .rstat.is-best b { color: var(--gold); }
-
 /* ---- the way back --------------------------------------------------------------------------- */
-.result__foot { display: flex; justify-content: flex-end; align-items: center; min-width: 0; }
+.result__foot { display: flex; justify-content: flex-end; align-items: center; min-width: 0; flex: 0 0 auto; margin-top: auto; }
 .result__foot .btn { min-width: max(2.2rem, 96px); }
 
 /* A portrait phone (or a narrow window): the panels stack, the header keeps its two rows. */
 @media (max-width: 640px), (max-aspect-ratio: 4/3) {
   .result__cols { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, .8fr); }
 }
+
+/* a match with gameplay plugins (DESIGN §32.6): the unofficial mark next to the logo */
+.result__modmark { align-self: flex-start; margin-top: .06rem; }
+.result__test { display: flex; align-items: center; gap: .08rem; margin: .08rem 0 0; color: #e8b84a; }

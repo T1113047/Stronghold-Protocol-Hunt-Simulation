@@ -13,10 +13,17 @@
 //                                         GitHub #58): every attack plays the clip once — at its own speed, faster
 //                                         only when the attacks come quicker than the clip —, then base (Move while
 //                                         the sim walks it: it stands for that clip, server/sim/ai.js attackStand)
-//   setSkill(on)                          skill begin, then — when the skill has an idle clip of its own (skill.idle,
-//                                         not its loop) — that idle between attacks, its loop (the skill's attack clip)
-//                                         only on attacks (community report #23: 折桠's S2 jump attack looped with no
-//                                         enemy engaged); end on stop. A skill clip with NEITHER a Begin nor an own Idle
+//   setSkill(on)                          skill begin once, then the loop for the whole skill when the clip is a
+//                                         begin/loop/end set with no idle of its own (DESIGN §34.4: 白面鸮 S2 holds
+//                                         Skill_Loop through every heal). An attack during that skill plays the skill's
+//                                         own attack clip when the skeleton has one (焰影苇草 Skill_3_Attack), or that
+//                                         loop when it has OnAttack (送葬人 S2: scaled to the interval, strikePose on
+//                                         that frame), then the loop again. A loop with no OnAttack is not restarted.
+//                                         A stun returns to the held loop; Begin waits until the stun ends if the skill
+//                                         turned on during it. A skill with an
+//                                         idle clip of its own (skill.idle, not its loop) stands in that idle between
+//                                         attacks and plays its loop only on attacks (community report #23: 折桠's S2
+//                                         jump). End on stop. A skill clip with NEITHER a Begin nor an own Idle
 //                                         (德克萨斯 剑雨 and the other 58 instant skills: anims.skill {begin:null,
 //                                         loop:'Skill', end:null}) plays that clip once for its own length: an instant
 //                                         skill's flag is off again within the same 0.5 s window (sim skills.js), so
@@ -38,9 +45,10 @@
 //                                         redraws the model, only advances `clock`)
 //   clipBounds(names)                     skeleton-space bounds of those clips (sampled once per skeleton data, see
 //                                         "clip bounds" below; render/units.js sizes the impostor box from them)
-// Each attack plays its clip once, then the end clip (if any) and base — except the attacks of a skill
-// with its own idle clip, which go straight back to that idle: the skill's end clip closes the skill, not each spell of
-// attacks while it runs.
+// Each attack plays its clip once, then the end clip (if any) and base — except a skill that holds its loop
+// (begin/loop/end and no idle of its own: the loop stays up, and a dedicated attack clip returns to that loop) and a
+// skill with its own idle clip (those attacks go straight back to that idle). The skill's end clip closes the skill,
+// not each attack while it runs.
 
 const clampN = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -95,24 +103,107 @@ export function pointInPolygon(x, y, pts, n) {
 }
 
 /**
- * World centre of what a slot draws, into `out` ([x, y]); false when it draws nothing measurable. A mesh: the mean of its
- * world vertices (`buf` grows to fit); a region: its quad's centre — the attachment's (x, y) through the bone (the four
- * corners sit symmetrically around it; RegionAttachment.computeWorldVertices takes a bone in runtime 3.8, a slot in 4.1).
+ * The eyelid fallback's cut (SpineActor._eyeMaskFallback, GitHub #647): a covered slot is hidden when less than
+ * CLIP_HIDE_SHARE of its drawn area lies inside the clip polygon, kept when at least CLIP_KEEP_SHARE does, and in
+ * between its centre decides (the 0.2.2 rule, GitHub #177). [ASSUMED] both shares.
  */
-function slotCentre(slot, att, buf, out) {
+const CLIP_HIDE_SHARE = 0.25, CLIP_KEEP_SHARE = 0.5;
+
+/**
+ * World geometry of what a slot draws, into `buf.v` (grown to fit): a vertex attachment's world vertices (a mesh), else
+ * a region's quad — its attachment rectangle (width × height × scale, rotated, at x / y) through the bone, corners in
+ * order. Returns the number of floats written, 0 when nothing is measurable. pixi-spine keeps a bone's world transform
+ * in `bone.matrix` (a PIXI Matrix, whose b / c are spine's c / b); spine-ts's a…d / worldX / worldY are read only when
+ * there is no matrix — 0.2.2 read those alone, undefined on pixi-spine's bones, so no region was ever measured.
+ */
+function drawnVerts(slot, att, buf) {
   const n = att.worldVerticesLength | 0;
   if (n >= 2 && typeof att.computeWorldVertices === 'function') {
     if (buf.v.length < n) buf.v = new Float32Array(n);
-    const v = buf.v;
-    att.computeWorldVertices(slot, 0, n, v, 0, 2);
-    let cx = 0, cy = 0;
-    for (let k = 0; k < n; k += 2) { cx += v[k]; cy += v[k + 1]; }
-    out[0] = cx / (n >> 1); out[1] = cy / (n >> 1);
-  } else if (att.region !== undefined && Number.isFinite(att.x) && Number.isFinite(att.y) && slot.bone) {
-    const b = slot.bone;
-    out[0] = b.a * att.x + b.b * att.y + b.worldX; out[1] = b.c * att.x + b.d * att.y + b.worldY;
-  } else return false;
-  return Number.isFinite(out[0]) && Number.isFinite(out[1]);
+    att.computeWorldVertices(slot, 0, n, buf.v, 0, 2);
+    return n;
+  }
+  const b = slot.bone;
+  if (att.region === undefined || !b || !Number.isFinite(att.x) || !Number.isFinite(att.y) || !(att.width > 0) || !(att.height > 0)) return 0;
+  const m = b.matrix;
+  const a = m ? m.a : b.a, bb = m ? m.c : b.b, c = m ? m.b : b.c, d = m ? m.d : b.d, tx = m ? m.tx : b.worldX, ty = m ? m.ty : b.worldY;
+  const hw = (att.width * (Number.isFinite(att.scaleX) ? att.scaleX : 1)) / 2, hh = (att.height * (Number.isFinite(att.scaleY) ? att.scaleY : 1)) / 2;
+  const rad = ((att.rotation || 0) * Math.PI) / 180, cs = Math.cos(rad), sn = Math.sin(rad);
+  const v = buf.v;
+  for (let q = 0; q < 4; q++) {
+    const px = q === 0 || q === 3 ? -hw : hw, py = q < 2 ? -hh : hh;
+    const lx = px * cs - py * sn + att.x, ly = px * sn + py * cs + att.y;
+    v[q * 2] = a * lx + bb * ly + tx; v[q * 2 + 1] = c * lx + d * ly + ty;
+  }
+  return 8;
+}
+
+/** Twice the signed area of the polygon of `n` points `p` (flat). */
+function area2(p, n) {
+  let s = 0;
+  for (let i = 0, j = n - 1; i < n; j = i++) s += p[j * 2] * p[i * 2 + 1] - p[i * 2] * p[j * 2 + 1];
+  return s;
+}
+
+/**
+ * Area of the polygon `poly` (`pn` points) inside the convex polygon `win` (`wn` points): Sutherland–Hodgman with the
+ * clip polygon as the subject, so a concave one is measured exactly (the bridge edges a concave subject leaves along the
+ * window's border add no area). `buf.a` / `buf.b` are scratch buffers, grown to fit (each pass at most doubles the points).
+ */
+function clippedArea(poly, pn, win, wn, buf) {
+  const w2 = area2(win, wn);
+  if (!(Math.abs(w2) > 1e-9)) return 0;
+  const sg = w2 > 0 ? 1 : -1, cap = pn * 2 * 2 ** wn;
+  if (buf.a.length < cap) { buf.a = new Float64Array(cap); buf.b = new Float64Array(cap); }
+  let src = buf.a, dst = buf.b, m = pn;
+  for (let i = 0; i < pn * 2; i++) src[i] = poly[i];
+  for (let e = 0; e < wn && m >= 3; e++) {
+    const ax = win[e * 2], ay = win[e * 2 + 1], k = (e + 1) % wn, ex = win[k * 2] - ax, ey = win[k * 2 + 1] - ay;
+    let o = 0;
+    for (let i = 0; i < m; i++) {
+      const j = i + 1 < m ? i + 1 : 0;
+      const px = src[i * 2], py = src[i * 2 + 1], qx = src[j * 2], qy = src[j * 2 + 1];
+      const dp = sg * (ex * (py - ay) - ey * (px - ax)), dq = sg * (ex * (qy - ay) - ey * (qx - ax));
+      if (dp >= 0) { dst[o++] = px; dst[o++] = py; }
+      if ((dp >= 0) !== (dq >= 0)) { const t = dp / (dp - dq); dst[o++] = px + (qx - px) * t; dst[o++] = py + (qy - py) * t; }
+    }
+    m = o >> 1;
+    const s = src; src = dst; dst = s;
+  }
+  return m >= 3 ? Math.abs(area2(src, m)) / 2 : 0;
+}
+
+/**
+ * Does the eyelid fallback hide covered slot `slot` (drawing `att`) under the clip polygon `poly` of `pn` (≥ 3) points?
+ * By the share of its drawn area inside the polygon — what the stencil would keep: each mesh triangle (a region: its
+ * quad) clips the polygon — and in the middle band (CLIP_HIDE_SHARE … CLIP_KEEP_SHARE), or when no area is measurable
+ * (a path, a collapsed mesh), by its centre (mesh: the mean of its vertices; region: its quad's centre).
+ */
+function clipHides(slot, att, buf, poly, pn) {
+  const n = drawnVerts(slot, att, buf);
+  if (!n) return false;
+  const v = buf.v, tri = att.triangles;
+  let total = 0, inside = 0;
+  if ((att.worldVerticesLength | 0) < 2) { total = Math.abs(area2(v, 4)) / 2; inside = clippedArea(poly, pn, v, 4, buf); }
+  else if (tri && tri.length >= 3) {
+    const w = buf.w;
+    for (let k = 0; k + 2 < tri.length; k += 3) {
+      const i0 = tri[k] * 2, i1 = tri[k + 1] * 2, i2 = tri[k + 2] * 2;
+      if (i0 + 1 >= n || i1 + 1 >= n || i2 + 1 >= n) continue;
+      w[0] = v[i0]; w[1] = v[i0 + 1]; w[2] = v[i1]; w[3] = v[i1 + 1]; w[4] = v[i2]; w[5] = v[i2 + 1];
+      const a = Math.abs(area2(w, 3)) / 2;
+      if (!(a > 0)) continue;
+      total += a;
+      inside += clippedArea(poly, pn, w, 3, buf);
+    }
+  }
+  const share = total > 1e-6 ? inside / total : NaN;
+  if (share < CLIP_HIDE_SHARE) return true;
+  if (share >= CLIP_KEEP_SHARE) return false;
+  let cx = 0, cy = 0;
+  for (let k = 0; k < n; k += 2) { cx += v[k]; cy += v[k + 1]; }
+  cx /= n >> 1; cy /= n >> 1;
+  return Number.isFinite(cx) && Number.isFinite(cy) && !pointInPolygon(cx, cy, poly, pn);
 }
 
 // ---- clip bounds (GitHub #542) ------------------------------------------------------------------------------------
@@ -330,6 +421,7 @@ export class SpineActor {
     this.skillOn = false;
     this.skillClipOnce = false;    // skillBegin: the skill's own clip plays once (a clip with no Begin / own Idle)
     this.skillEndPending = false;  // … and the skill turned off inside it: play its End clip / base when it ends
+    this.skillBeginPending = false; // setSkill(true) during a stun: Begin plays when the stun ends (§34.4.1)
     this.attackUntil = 0;
     this.clock = 0;
     this.current = '';
@@ -475,6 +567,9 @@ export class SpineActor {
 
   _idleName() {
     const sk = this.roles.skill;
+    // [ASSUMED] DESIGN §34.4.1: the resting clip of a held skill is its loop. Idle here is the stand-up a stun
+    // used to leave behind for the rest of the skill (白面鸮 S2).
+    if (this._skillLoopHeld()) return sk.loop;
     if (this.skillOn && sk && this.has(sk.idle)) return sk.idle;
     return this.has(this.roles.idle) ? this.roles.idle : (this.has('Idle') ? 'Idle' : [...this.names][0]);
   }
@@ -537,6 +632,18 @@ export class SpineActor {
   _leaveStun() {
     this.frozen = false;
     this.mode = 'base';
+    // [ASSUMED] DESIGN §34.4.1: Begin cannot play under a stun. A skill that turned on during it plays Begin
+    // now and queues the loop. A skill that was already on resumes the loop through _idleName (no second Begin).
+    if (this.skillBeginPending && this._skillLoopHeld()) {
+      this.skillBeginPending = false;
+      const sk = this.roles.skill;
+      this.mode = 'skillBegin';
+      this._play(sk.begin, false, { mix: 0.08 });
+      this.skillBeginUntil = this.clock + this.dur(sk.begin);
+      if (this.has(sk.loop)) this._queue(sk.loop, true);
+      return;
+    }
+    this.skillBeginPending = false;
     this._play(this._baseName(), true);
   }
 
@@ -564,6 +671,12 @@ export class SpineActor {
     this._play(clip.loop, false, { timeScale: plan.tsWind, start: plan.start, mix: 0.06 });
     this.windTs = plan.ts;
     this.windUntil = this.clock + lead;
+    // for the official effects that start with the cast (render/vfx/wiring.js castStart): how far into its clip the
+    // wind-up started and when the cast ends, in game s at the clip's own speed — sped up only when the attacks come
+    // quicker than the clip, as the client plays it (this actor may stretch the clip over a slower rhythm)
+    const tsOff = clampN(loopDur / iv, 1, 4);
+    this.windSkip = plan.start / tsOff;
+    this.windCastLeft = lead + Math.max(0, loopDur - hit) / tsOff;
     this.wound = true;
     return true;
   }
@@ -612,16 +725,92 @@ export class SpineActor {
     }
   }
 
+  /**
+   * Begin / loop / end, and no idle of its own: the loop is the stance for the whole skill (DESIGN §34.4).
+   * A distinct skill.idle (折桠 Skill_2_Idle) is the stance between attacks, so the loop stays the attack clip.
+   * via:'attack' (远牙: the role is the normal attack triple) is not a skill stance.
+   */
+  _skillLoopHeld() {
+    const sk = this.roles.skill;
+    if (!this.skillOn || !sk || sk.via === 'attack') return false;
+    if (!this.has(sk.begin) || !this.has(sk.loop) || !this.has(sk.end)) return false;
+    if (sk.idle && sk.idle !== sk.loop && this.has(sk.idle)) return false;
+    return true;
+  }
+
+  /** Skill_3_Begin → Skill_3, Skill_Start → Skill, Skill1_Loop → Skill1. */
+  _skillPrefix() {
+    const sk = this.roles.skill;
+    const name = (sk && (sk.begin || sk.loop)) || '';
+    return String(name).replace(/_(?:Begin|Start|Loop|End|Idle)$/i, '').replace(/(?:Begin|Start|Loop|End|Idle)$/i, '');
+  }
+
+  /**
+   * This skill's own strike clip, which the resolver drops when a Loop exists (anim-roles skillFamily: loop =
+   * P_Loop before P_Attack). 焰影苇草 S3 is Skill_3_Attack beside Skill_3_Begin/Loop/End.
+   * [ASSUMED] (DESIGN §34.4.1): no table says which clip an atk plays during a held loop. Only a same-prefix
+   * `<prefix>_Attack` (or `<prefix>_Attack_*`, not Down / Begin / End / Idle) counts — not the normal Attack and
+   * not another skill's Attack_2 (塞雷娅). A loop that itself contains OnAttack is not a separate clip: `_attackClip`
+   * returns the skill role so the existing per-attack scale and strikePose path plays that loop.
+   */
+  _skillOwnAttack() {
+    const sk = this.roles.skill;
+    if (!sk || /attack/i.test(sk.loop || '')) return null;
+    const prefix = this._skillPrefix();
+    if (!prefix) return null;
+    const used = new Set([sk.begin, sk.loop, sk.end, sk.idle]);
+    const head = `${prefix}_Attack`;
+    const re = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}_Attack(?:_|$)`, 'i');
+    const hits = (this.entry && this.entry.hits) || {};
+    const cands = [];
+    for (const n of this.names) {
+      if (used.has(n) || /down/i.test(n) || /_(?:begin|start|end|idle)(?:_|$)/i.test(n)) continue;
+      if (!re.test(n)) continue;
+      cands.push(n);
+    }
+    if (!cands.length) return null;
+    if (cands.includes(head)) return head;
+    cands.sort();
+    const withHit = cands.find((n) => Array.isArray(hits[n]) && hits[n].length);
+    return withHit || cands[0];
+  }
+
   _attackClip() {
     const sk = this.roles.skill;
-    if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) return sk;
+    const mode = this.skillOn ? this.skillAttackMode?.() : null;
+    if (this.skillOn && !this._skillLoopHeld()) {
+      if (mode?.animKey === 'Attack') {
+        const a = mode.down && this.has(this.roles.attackDown?.loop) ? this.roles.attackDown : this.roles.attack;
+        if (this.has(a?.loop)) return a;
+      } else if (this.has(mode?.animKey)) {
+        if (mode.animKey === sk?.loop) return sk; // keep a skill's own idle / End ownership
+        return { begin: null, loop: mode.animKey, end: null };
+      }
+      // [ASSUMED] A cosmetic skeleton missing the official clip retains its own roles (§34.31).
+    }
+    if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) {
+      if (this._skillLoopHeld()) {
+        // A dedicated strike clip (焰影苇草 Skill_3_Attack) wins. Otherwise a loop that itself has OnAttack is
+        // the strike: return the skill role so windUp / attack scale it and strikePose is that frame. The attack
+        // end already returns to the looping loop and skips End. A loop with no OnAttack stays put — returning
+        // the normal attack would stand her up (白面鸮 S2). [ASSUMED] DESIGN §34.4.1.
+        const atk = this._skillOwnAttack();
+        if (atk) return { begin: null, loop: atk, end: null };
+        const hits = this.entry && this.entry.hits && this.entry.hits[sk.loop];
+        if (Array.isArray(hits) && hits.length) return sk;
+        return null;
+      }
+      // Without a verified mode mapping the skill clip stays the attack clip, as before §34.31: a lone clip without
+      // OnAttack is not proof of a cast (the integrator kept unverified operators unchanged, with or without the index).
+      return sk;
+    }
     const a = this.roles.attack;
     if (a && this.has(a.loop)) return a;
     return null;
   }
 
   // Skill loops that are pure stances (no OnAttack in the loop) are still valid attack visuals during a skill;
-  // only an idle-typed skill loop is treated as buff-only.
+  // only an idle-typed skill loop is treated as buff-only (a verified mode mapping wins first, §34.31).
   _skillIsBuffOnly() {
     const sk = this.roles.skill;
     return !!sk && sk.loop === this.roles.idle;
@@ -638,6 +827,18 @@ export class SpineActor {
     return this._attackClip() === sk ? sk.idle : null;
   }
 
+  /**
+   * The strike frame of the attack clip playing now — { anim (the spine Animation), time (its first hit, s) } — or null
+   * when no attack clip plays (render/units.js boneOffset: a shot leaves the muzzle as that frame poses it).
+   */
+  strikePose() {
+    if (this.mode !== 'attack' || this.dead) return null;
+    const tr = this.spine && this.spine.state ? this.spine.state.tracks[0] : null;
+    const anim = tr && tr.animation;
+    if (!anim || anim.name !== this.current) return null;
+    return { anim, time: this._hitTime(anim.name, this.dur(anim.name)) };
+  }
+
   _hitTime(anim, dur) {
     const hits = this.entry.hits && this.entry.hits[anim];
     if (Array.isArray(hits) && hits.length && Number.isFinite(hits[0])) return clampN(hits[0], 0, dur);
@@ -650,7 +851,13 @@ export class SpineActor {
     if (on === this.skillOn || this.dead) return;
     this.skillOn = on;
     const sk = this.roles.skill;
-    if (this.mode === 'stun' || this.mode === 'die') return;
+    if (this.mode === 'stun' || this.mode === 'die') {
+      // [ASSUMED] DESIGN §34.4.1: Begin waits out a stun. A skill that is already on keeps its loop via _idleName.
+      if (on && this.mode === 'stun' && this._skillLoopHeld()) this.skillBeginPending = true;
+      if (!on) this.skillBeginPending = false;
+      return;
+    }
+    this.skillBeginPending = false;
     // a skill that ends as the unit (re)deploys — 乌尔比安's 【返回】 is a 【移动】 (sim Battle.moveRedeploy) right before
     // his S3's 'skill' off event — lets the deploy clip play out (then the plain idle) instead of cutting it with the End
     if (!on && this.mode === 'deploy') return;
@@ -726,6 +933,7 @@ export class SpineActor {
     if (this.dead) return 0;
     this.dead = true;
     this.frozen = false;
+    this.skillBeginPending = false;
     this.mode = 'die';
     const d = this.dieClip();
     if (d) { this._play(d, false, { mix: 0.05 }); return this.dur(d); }
@@ -759,6 +967,7 @@ export class SpineActor {
     this.frozen = false;
     this.mode = 'base';
     this.skillOn = false;
+    this.skillBeginPending = false;
     this._play(this._baseName(), true);
   }
 
@@ -781,6 +990,12 @@ export class SpineActor {
         if (this.clock > this.attackUntil) {
           this.mode = 'base';
           this.wound = false;
+          // a held begin/loop/end skill: the dedicated attack clip (if the skeleton has one) returns to the
+          // looping loop. Skill_End and Idle would stand her up between heals (DESIGN §34.4).
+          if (this._skillLoopHeld() && this.has(this.roles.skill.loop)) {
+            this._play(this.roles.skill.loop, true, { mix: 0.15 });
+            break;
+          }
           const clip = this._attackClip() || this.roles.attack;
           // a skill with its own idle: back to that idle (its end clip is for the end of the skill, setSkill(false))
           const toSkillIdle = clip === this.roles.skill && !!this._skillIdle();
@@ -844,15 +1059,17 @@ export class SpineActor {
    * are off on a crowded field or below high quality (render/app.js pickClipping), and the eyeballs showed through
    * the closed lids (佩佩, 仇白, 隐德来希, 琳琅诗怀雅 …). While they are off, every slot a clip covers — walked in draw
    * order from the clipping slot to its endSlot, with the attachments in force (any skin), as pixi-spine does — is
-   * hidden for the frame when the centre of what it draws lies outside the clip polygon [ASSUMED: all or nothing per
-   * slot, an approximation of the mask's cut]. pixi-spine shows every attached slot container again on each update.
+   * hidden for the frame when the clip would cut most of it (clipHides: less than a quarter of its drawn area inside the
+   * polygon, or less than half with its centre outside; GitHub #647 — 纯烬艾雅法拉's eyeballs are regions, never measured
+   * before, and her lids close to a slit through their centres) [ASSUMED: all or nothing per slot, an approximation of
+   * the mask's cut]. pixi-spine shows every attached slot container again on each update.
    */
   _eyeMaskFallback() {
     const sp = this.spine, skel = sp && sp.skeleton, boxes = sp && sp.slotContainers;
     if (!skel || !Array.isArray(skel.drawOrder) || !boxes) return;
     this._showClipHidden();   // undo the last pass (a pixi-spine update re-shows them anyway; a frozen one does not)
     try {
-      const buf = this._clipBuf || (this._clipBuf = { v: new Float32Array(64), poly: new Float32Array(16), c: [0, 0] });
+      const buf = this._clipBuf || (this._clipBuf = { v: new Float32Array(64), poly: new Float32Array(16), w: new Float32Array(6), a: new Float64Array(256), b: new Float64Array(256) });
       let pn = -1, end = null;   // pn: points of the clip in force (−1: none; < 3: degenerate, hides nothing)
       for (const slot of skel.drawOrder) {
         const att = typeof slot.getAttachment === 'function' ? slot.getAttachment() : slot.attachment;
@@ -866,7 +1083,7 @@ export class SpineActor {
         }
         if (pn < 0) continue;
         const box = boxes[slot.data.index];
-        if (pn >= 3 && att && box && slotCentre(slot, att, buf, buf.c) && !pointInPolygon(buf.c[0], buf.c[1], buf.poly, pn)) {
+        if (pn >= 3 && att && box && clipHides(slot, att, buf, buf.poly, pn)) {
           box.visible = false;
           this._clipHidden.add(slot.data.index);
         }

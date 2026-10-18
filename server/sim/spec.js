@@ -3,7 +3,7 @@
 // DESIGN §14. Pure ESM (served at /sim/spec.js): no Node API.
 //
 //   const spec = buildBattleSpec({ battleId, fieldId, kind, seed, modeId, round, stageId, rect, timeLimit, players,
-//                                  spawns, routes, flags, enemyOverrides, waveId, bossId, content, boss })
+//                                  spawns, routes, flags, enemyOverrides, waveId, bossId, content, boss, cs, vs })
 //   const battle = createBattleFromSpec(spec, dataSource, { sharedBoss?, BattleClass?, logger?, recordEvents?, quiet? })
 //
 // A spec is JSON-safe by construction (it IS the JSON round trip of its inputs: `undefined` / functions vanish,
@@ -30,10 +30,17 @@
 // `cultivate` (练度 0–3: the effects.json CHAR_MAP aceffect_char_1…4 — a ×ATK / ×DEF / ×max HP of the unit, its own
 // multiplier); each kept only when well-formed and never on a stand-in. Absent: full potential and no 练度 (a raw
 // unit — the match always states both for an owned operator: PlayerState.battleInput).
+// Content identity (DESIGN §32): `cs`, the content hash of the room's content set (shared/plugins/identity.js; 64 hex
+// digits), is kept when well-formed and left out otherwise — a spec built without one is what it always was. The sim
+// never reads it: it names what the battle runs on — a browser that has not loaded that content is no authority of the
+// battle and a b.result naming another one is refused (P1c, DESIGN §32.6) —, the diagnostics and replays. `vs` (P1c), the
+// room's visual set of cosmetic plugins (shared/plugins/visual.js; 64 hex digits), likewise: kept when well-formed, never
+// read by the sim — a replay or a bug report names the art the battle was drawn with.
 
 import { Battle } from './Battle.js';
 import { toDataSource, withUnitLoadouts } from './simdata.js';
 import { isPotential, isCultivate } from '../../shared/potential.js';
+import { isContentHash } from '../../shared/plugins/identity.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
 
 export const SPEC_VERSION = 1;
@@ -79,6 +86,11 @@ export function buildBattleSpec(o = {}) {
     bossId: o.bossId ?? null,
     content: o.content ?? 'full',
     boss: bossLike && o.boss ? { poolHp: Number(o.boss.poolHp) || 0, poolMax: Number(o.boss.poolMax) || 1 } : null,
+    // the content set the battle runs on and the art it was drawn with (header): not read by the sim
+    ...(isContentHash(o.cs) ? { cs: o.cs } : {}),
+    ...(isContentHash(o.vs) ? { vs: o.vs } : {}),
+    // morphPairing plus only. An official spec grows no key (identity and extra-field tests).
+    ...(o.morphPairing === 'plus' ? { morphPairing: 'plus' } : {}),
   };
   const out = JSON.parse(JSON.stringify(spec, specReplacer));
   for (const p of out.players) for (const u of (p && Array.isArray(p.units) ? p.units : [])) if (u && typeof u === 'object') sanitizeUnitLoadout(u);
@@ -161,6 +173,7 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
     content: opts.content ?? s.content ?? 'full',
   };
   if (s.bossId != null) battleOpts.bossId = s.bossId;
+  if (s.morphPairing === 'plus') battleOpts.morphPairing = 'plus';
   if (opts.logger) battleOpts.logger = opts.logger;
   if (opts.recordEvents === false) battleOpts.recordEvents = false;
   if (opts.quiet) battleOpts.quiet = true;
@@ -255,9 +268,11 @@ export function attachLpMeter(battle) {
 /**
  * 联防 (user playtest #6 item 7): each source player's enemies still standing on a unite field — not spawned yet,
  * alive, or already through the objective again — i.e. what settlement would charge them if the battle ended now
- * (server/match/unite.js uniteSurvivors: the unite result's counted leaks + unspawned entries by `sourcePlayerId`;
- * alive enemies become leaks on a timeout, keyed like Battle._recordLeak). It falls as the helpers strike them down and
- * rises when one splits or summons (content-spawned children inherit the parent's sourcePlayerId).
+ * (server/match/unite.js uniteSurvivors: the unite result's leaks + unspawned entries by `sourcePlayerId`; alive enemies
+ * become leaks on a timeout, keyed like Battle._recordLeak). It falls as the helpers strike them down; nothing that
+ * appears while the field runs ever raises it — a 联防 field tags its runtime spawns `uniteRuntime` at birth (spawns.js,
+ * player report 2026-10-16: a child or a summon never crossed the leaker's own goal), and every read here filters it
+ * out. Reports
  * `{ [playerId]: n }` (a player with none left is absent), or null for a battle without the sim's state (a stand-in).
  * @returns {Record<string, number> | null}
  */
@@ -268,14 +283,14 @@ export function uniteLeft(battle) {
   if (battle.finished && typeof battle.result === 'function') {
     const r = battle.result();
     if (!r || !r.perPlayer) return null;
-    for (const pp of Object.values(r.perPlayer)) for (const l of (pp && pp.leaked) || []) if (l && l.counted !== false) add(l.sourcePlayerId);
+    for (const pp of Object.values(r.perPlayer)) for (const l of (pp && pp.leaked) || []) if (l && l.counted !== false && !l.uniteRuntime) add(l.sourcePlayerId);
     for (const u of r.unspawned || []) if (u) add(u.sourcePlayerId);
     return out;
   }
   if (!battle._perPlayer || !Array.isArray(battle._pending) || !Array.isArray(battle.enemies)) return null;
   for (const p of battle._pending) if (p) add(p.sourcePlayerId);
-  for (const e of battle.enemies) if (e && e.alive && e.counted) add(e.sourcePlayerId ?? e.ownerId);
-  for (const pp of Object.values(battle._perPlayer)) for (const l of (pp && pp.leaked) || []) if (l && l.counted !== false) add(l.sourcePlayerId);
+  for (const e of battle.enemies) if (e && e.alive && e.counted && !e.uniteRuntime) add(e.sourcePlayerId ?? e.ownerId);
+  for (const pp of Object.values(battle._perPlayer)) for (const l of (pp && pp.leaked) || []) if (l && l.counted !== false && !l.uniteRuntime) add(l.sourcePlayerId);
   return out;
 }
 
@@ -329,9 +344,18 @@ function numberOrNull(v, cap = Infinity) {
 const r4 = (v) => Math.round((Number(v) || 0) * 1e4) / 1e4;
 const modsKey = (m) => (m && typeof m === 'object' ? JSON.stringify(Object.keys(m).filter((k) => m[k] !== undefined).sort().map((k) => [k, m[k]])) : '');
 
+/** Actual enemy kills credited to a player, with a fallback for older reports. @param {any} player */
+export function creditedKillsOf(player) {
+  if (Number.isInteger(player?.creditedKills) && player.creditedKills >= 0) return player.creditedKills;
+  // Compatibility with battle reports made before the summary existed; never use wave-owned `killed` here.
+  return (Array.isArray(player?.unitStats) ? player.unitStats : []).reduce((n, u) => n + (Number.isFinite(u?.kills) ? Math.max(0, Math.trunc(u.kills)) : 0), 0);
+}
+
 /**
  * Canonical summary of a BattleResult (everything the match consumes): used to compare a client's result with the
- * server's re-simulation (SP_VERIFY) and by the determinism tests. Returns `{ json, hash }`.
+ * server's re-simulation (SP_VERIFY) and by the determinism tests. Returns `{ json, hash }`. The statistics-only
+ * `creditedKills` (PR #509) is left out: the match never reads it for an outcome, so it must not split a client's and the
+ * server's digests (a report without it falls back to the capped unitStats).
  */
 export function resultDigest(result) {
   const res = result && typeof result === 'object' ? result : {};
@@ -344,7 +368,9 @@ export function resultDigest(result) {
       p.killed | 0, p.total | 0, !!p.perfect, r4(p.coins), r4(p.bank),
       Object.keys(lg).sort().map((k) => [k, r4(lg[k])]),
       // mods included: a leak re-enters the 联防 with them (round multipliers, bounty id)
-      (Array.isArray(p.leaked) ? p.leaked : []).map((l) => `${l && l.enemyKey}|${l && l.counted === false ? 0 : 1}|${(l && l.sourcePlayerId) || ''}|${modsKey(l && l.mods)}`).sort(),
+      // mods included: a leak re-enters the 联防 with them (round multipliers, bounty id); `uniteRuntime` too — it decides
+      // whether the 联防 bills the leak, so a client must not be able to report it differently from the re-simulation
+      (Array.isArray(p.leaked) ? p.leaked : []).map((l) => `${l && l.enemyKey}|${l && l.counted === false ? 0 : 1}|${l && l.uniteRuntime ? 'x' : ''}|${(l && l.sourcePlayerId) || ''}|${modsKey(l && l.mods)}`).sort(),
       Math.round(Number(p.damageDealt) || 0), Math.round(Number(p.bossDamage) || 0),
       (Array.isArray(p.unitsEnd) ? p.unitsEnd : []).map((u) => [u && u.uid, r4(u && u.hpPct), r4(u && u.sp), !!(u && u.alive)]),
     ];
@@ -393,9 +419,11 @@ export function compactResult(res) {
       // `killed` keeps the sim's reading (every counted knock-out, runtime splits / summons included) and is deliberately
       // NOT clamped to `total`: the denominator counts only the round's own scheduled enemies (Battle.resolved)
       killed: Math.max(0, Math.trunc(fnum(p.killed))),
+      creditedKills: creditedKillsOf(p),
       total,
       leaked: leakEntries(p).map((l) => {
         const o = { enemyKey: l.enemyKey, mods: compactMods(l.mods), lpr: leakLpr(l), sourcePlayerId: keyOr(l.sourcePlayerId), tag: typeof l.tag === 'string' && l.tag.length <= 16 ? l.tag : null, counted: l.counted !== false };
+        if (l.uniteRuntime) o.uniteRuntime = true; // born on a 联防 field: the server must not bill it (unite.js uniteSurvivors)
         if (l.boss) o.boss = true;
         if (l.spawned) o.spawned = true;
         return o;

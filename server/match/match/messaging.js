@@ -174,7 +174,8 @@ export class MatchMessaging {
       const json = JSON.stringify(rest);
       if (!force && json === this._lastPubJson) return;
       this._lastPubJson = json;
-      this._lastPubAt = now;
+      // Snapshot building / serialization can take time; throttle from the actual broadcast, not its start.
+      this._lastPubAt = this.sched.now();
       this.broadcast(base);
       return;
     }
@@ -190,7 +191,8 @@ export class MatchMessaging {
       for (const ps of this.order) if (this.teamIdOf(ps) === t) this.sendTo(ps.playerId, view);
     }
     if (!sent && !force) return;
-    this._lastPubAt = now;
+    // Snapshot building / serialization can take time; throttle from the actual broadcast, not its start.
+    this._lastPubAt = this.sched.now();
     for (const sp of this.spectators.values()) this.sendTo(sp.playerId, base);
   }
 }

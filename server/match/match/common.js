@@ -19,7 +19,7 @@ export const fail = (error, detail) => (detail ? { error, detail } : { error });
 const delay = (env, dflt) => { const v = Number(process.env[env]); return Number.isFinite(v) && v >= 0 ? v : dflt; };
 export const DELAYS = Object.freeze({
   // [LATENCY] 回合间过场由 2000 → 1000 ms（可用 SP_DELAY_ROUND_START 覆盖）
-  ROUND_START: delay('SP_DELAY_ROUND_START', 1000),
+  ROUND_START: delay('SP_DELAY_ROUND_START', 2000),
   COMBAT_END: delay('SP_DELAY_COMBAT_END', 1500),
   SETTLE: delay('SP_DELAY_SETTLE', 3000),
   BOT_ACTION: delay('SP_DELAY_BOT_ACTION', 900),

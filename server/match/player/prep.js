@@ -34,13 +34,13 @@ export class PlayerPrep {
     const handFull = freeSlot(this.hand) < 0;
     if (slot.kind === 'item') {
       if (!this.gd.item(slot.id)) return fail(ERR.BAD_TARGET);
-      if (!this.m.itemPool.canGain(slot.id)) return fail(ERR.SOLD_OUT);
+      // Already displayed equipment rewards survive stock exhaustion (#624, maintainer 2026-10-14).
       if (handFull) return fail(ERR.HAND_FULL);
     } else if (slot.kind === 'chess') {
       const rec = this.gd.chess(slot.id);
       if (!rec || (rec.isDiy && !rec.diyFor)) return fail(ERR.BAD_TARGET);
       // Owner decision 2026-10-11 (#498): already displayed operator rewards survive stock exhaustion.
-      // acquireChess records the deficit. Item rewards above still require itemPool.canGain.
+      // acquireChess records the deficit. Displayed item rewards do the same (acquireItem displayed).
       if (handFull) return fail(ERR.HAND_FULL);
     } else return fail(ERR.BAD_TARGET);
     const price = Number.isFinite(slot.price) && slot.price > 0 ? Math.trunc(slot.price) : 0;
@@ -48,8 +48,19 @@ export class PlayerPrep {
     slot.sold = true;
     this.offers.shift();
     if (price > 0) this.spend(price);
-    if (slot.kind === 'item') this.acquireItem(slot.id, { source: 'reward' });
-    else this.acquireChess(slot.id, { source: 'reward' });
+    if (slot.kind === 'item') {
+      const gained = this.acquireItem(slot.id, { source: 'reward', displayed: true });
+      // #677: maintainer decision 2026-10-17 (official play memory): one Cathy cell per player/match.
+      // [ASSUMED] Only a successful pick from this source counts; Quintus's grant is independent.
+      if (gained && offer.source === 'band:band_cathy' && slot.id === 'chess_item_5_08_e_a') {
+        this.counters['band:cathy:cellTaken'] = 1;
+        // [ASSUMED] Remove the cell from queued Cathy offers too, retaining their other choices without rerolling.
+        for (const pending of this.offers) if (pending.source === 'band:band_cathy') {
+          pending.slots = pending.slots.filter((s) => s.id !== slot.id);
+        }
+        this.offers = this.offers.filter((pending) => pending.slots.length);
+      }
+    } else this.acquireChess(slot.id, { source: 'reward' });
     this._afterSpend(price, 'reward');
     this.recompute();
     return OK;
@@ -89,7 +100,9 @@ export class PlayerPrep {
       if (p.kind === 'chess') {
         this.removeTokensOf(p.uid);
         this.returnCopies(p);
-      }
+        for (const it of p.items || []) this.releaseItemStock(it);
+        p.items = [];
+      } else if (p.kind === 'item') this.releaseItemStock(p);
     }
     if (changed) this.recompute();
   }

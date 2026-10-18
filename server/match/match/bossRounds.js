@@ -7,6 +7,7 @@
 
 import { PHASE, GEO, TEAM_SIZE } from '../../../shared/constants.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
+import { creditedKillsOf } from '../../sim/spec.js';
 import { buildBossWave, bountySpawns } from '../waves.js';
 import { pairPlayers, bossPoolHp, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
 import { bossTimeScore } from '../results.js';
@@ -148,21 +149,7 @@ export class MatchBoss {
     if (!alive.length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
     this.phase = hidden ? PHASE.HIDDEN_CORE : PHASE.FINAL_ASSAULT;
     this.lastResults = new Map();
-    if (!hidden) {
-      for (const ps of alive) ps.lpAtFinal = Math.max(0, ps.lp);
-      if (this.isVersus) {
-        // 2V2: each team merges its own LP; the scalar teamLp stays the sum (existing readers of m.public.teamLp / results).
-        this.teamLps = new Map();
-        for (const ps of alive) {
-          const t = this.teamIdOf(ps);
-          this.teamLps.set(t, (this.teamLps.get(t) || 0) + Math.max(0, ps.lp));
-        }
-        this.teamLp = [...this.teamLps.values()].reduce((s, v) => s + v, 0);
-      } else {
-        this.teamLps = null;
-        this.teamLp = alive.reduce((s, p) => s + Math.max(0, p.lp), 0);
-      }
-    }
+    if (!hidden) this._openTeamLp();
     const bossId = hidden ? this.hiddenBossId : this.bossId;
     // BOSS_HIT tickers ("对敌方领袖造成的伤害超过20% / 50% / 80%"): the player's damage to THIS leader over its pool —
     // the pool's own per-player tally, one pool per boss round (2V2: one pool per team). stats.bossDamage (the result's
@@ -272,6 +259,30 @@ export class MatchBoss {
       onDone: (runner) => this._finalDone(runner, hidden),
     });
     this.runner.start();
+  }
+
+  /**
+   * Merged team LP at the moment a Final Assault first opens. The Hidden Core keeps whatever is left;
+   * it does not call this again. A test jump straight into the hidden round calls it once when the
+   * assault that would have opened the pool was skipped. [ASSUMED] that sum is the alive players'
+   * current LP, not a leftover after a fight that did not happen.
+   * 2V2: each team merges its own LP (`teamLps`); the scalar `teamLp` stays the sum, for the existing readers of
+   * m.public.teamLp / the results. Solo/coop: the single pool, as before.
+   */
+  _openTeamLp() {
+    const alive = this.alivePlayers();
+    for (const ps of alive) ps.lpAtFinal = Math.max(0, ps.lp);
+    if (this.isVersus) {
+      this.teamLps = new Map();
+      for (const ps of alive) {
+        const t = this.teamIdOf(ps);
+        this.teamLps.set(t, (this.teamLps.get(t) || 0) + Math.max(0, ps.lp));
+      }
+      this.teamLp = [...this.teamLps.values()].reduce((s, v) => s + v, 0);
+    } else {
+      this.teamLps = null;
+      this.teamLp = alive.reduce((s, p) => s + Math.max(0, p.lp), 0);
+    }
   }
 
   _startFinalClient(hidden) {
@@ -605,6 +616,8 @@ export class MatchBoss {
   }
 
   _teamLpLoss(team, amount) {
+    // upstream contract: _teamLpLoss(n) — solo/coop's single pool; the 2V2 callers pass (team, n)
+    if (amount === undefined) { amount = team; team = 0; }
     const n = Number(amount);
     if (this._teamLpOf(team) == null || !Number.isFinite(n) || !(n > 0)) return;
     this._teamLpLossOf(team, n);
@@ -751,6 +764,7 @@ export class MatchBoss {
         if (pp && ps) {
           ps.stats.dmgDealt += Number(pp.damageDealt) || 0;
           ps.stats.kills += Number(pp.killed) || 0;
+          ps.creditedKills += creditedKillsOf(pp);
           ps.dirty(); // m.private.stats
           this._charDamageTickers(ps, pp);
         }

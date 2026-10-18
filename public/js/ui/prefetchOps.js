@@ -5,7 +5,10 @@
 // The object ids are resolved like render/app.js pieceInfo: data.lookup('tokens'|'chess') → assets.spine / assets.avatar,
 // else charId, else the id. Installed by ui/fieldHost.js at boot.
 
-import { assets, spineEntry, avatarUrl } from '../assets.js';
+// assets.js is imported on the first prefetch (not at the top): a page that never needs it keeps it out of the static
+// import graph (test/ui/plugins-client.test.js: a vanilla page loads no asset store at start).
+let A = null;
+const loadAssets = () => (A ||= import('../assets.js'));
 import { data } from '../data.js';
 import { store } from '../store.js';
 
@@ -35,7 +38,8 @@ function collectIds(root) {
 }
 
 /** Warm one piece id: preload its avatar image and parse (then release) its battle Spine, both best-effort. */
-function warmId(m, local, id) {
+async function warmId(m, local, id) {
+  const { assets, spineEntry, avatarUrl } = await loadAssets();
   const rec = data.lookup('tokens', id) || data.lookup('chess', id);
   if (!rec) return;
   const spineId = (rec.assets && rec.assets.spine) || rec.charId || id;
@@ -67,7 +71,7 @@ export function installOpPrefetch({ store: appStore = store } = {}) {
       const local = data.get('local');
       const s = appStore.get();
       const ids = collectIds([s.match && s.match.private, s.match && s.match.field]);
-      for (const id of ids) if (remember(id)) warmId(m, local, id);
+      for (const id of ids) if (remember(id)) warmId(m, local, id).catch(() => {});
     } catch { /* best effort: never throws */ }
   };
   appStore.subscribe((s, prev) => { if (s.match !== prev.match || s.room !== prev.room) run(); });

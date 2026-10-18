@@ -1,11 +1,11 @@
 # 卫戍协议：狩猎模拟 · Stronghold Protocol: Hunt Simulation
 
-**版本 `V0.0.1（0.2.6）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.2.6** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
+**版本 `V0.0.1（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
 
 > **非官方、非商业、不含游戏素材。** 本仓库与鹰角网络、Yostar 及其关联方没有任何关系；《明日方舟》相关素材版权归原权利人所有，不适用本项目的 GPL。仅供学习交流与个人非商业使用，详见下方[声明](#声明)与 [NOTICE.md](NOTICE.md)。
 
-![version](https://img.shields.io/badge/version-0.2.6-2ea44f)
-![fork](https://img.shields.io/badge/fork-V0.0.1（0.2.6）-8957e5)
+![version](https://img.shields.io/badge/version-0.3.1-2ea44f)
+![fork](https://img.shields.io/badge/fork-V0.0.1（0.3.1）-8957e5)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-22%20%7C%2024-339933)
 
@@ -47,7 +47,7 @@ English summary: [below](#english).
 
 - [声明](#声明) · [原项目与原作者](#原项目与原作者请先支持上游)
 - [什么是「狩猎」](#什么是狩猎) · [核心玩法](#核心玩法重点) · [相对原版的价值](#相对原版的价值)
-- [功能一览](#功能一览) · [下载](#下载) · [快速开始](#快速开始) · [联机方式](#联机方式) · [操作](#操作)
+- [功能一览](#功能一览) · [下载](#下载) · [快速开始](#快速开始) · [插件](#插件) · [联机方式](#联机方式) · [操作](#操作)
 - [文档](#文档) · [开发与测试](#开发与测试) · [项目结构](#项目结构)
 - [许可证](#许可证) · [致谢与数据来源](#致谢与数据来源) · [贡献](#贡献) · [English](#english)
 
@@ -187,6 +187,8 @@ English summary: [below](#english).
 5. **轻量运维。** 仍然是**单个 Node.js 进程 + WebSocket**，战斗在各玩家浏览器里模拟；一台低功耗小主机就能开服。
 6. **手机与低配友好。** 手机横屏优先，结算页分两栏；界面字号跟随设置里的「文字大小」；可切**简化平面 / 2D 棋盘**、关闭角色模型；核显 / 软件渲染会按 GPU 自动降档，玩家显式选择优先。
 
+**上游 0.3.1 带来的内容**：Forge 工坊包导入大幅补齐（主题变量、公告、行为开关、新的盟约 / 装备 / 召唤物 / 驻守与池外官方干员、面板兼容层、特效、皮肤），插件工作台为这些新功能加了图形化模板；设置新增「素材存储」（申请持久保存、清理旧版本素材）与「异形屏适配」；修复余、野鬃、缪尔赛思、瑕光等干员的官方特效和动作，琳琅诗怀雅三技能改为官方的不自动关闭，详见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 功能一览
 
 - **完整的一局**：确认本局信息 → 策略轮选（40 名策略）→ 14 回合 → 结算称号；险境及以上满足条件时进入第 15 回合「隐秘核心」。
@@ -198,6 +200,8 @@ English summary: [below](#english).
 - **商人「坎诺特」**：赏金不进金币，休整期在金币卡上方的头像处按比率取钱；首取 ceil、之后 floor，每回合 4 金上限、R15 不限。
 - **对面视角**：对手在 R13 最终狩猎之后（R14 最终攻势起）公开；**观战席从第一回合起就能看所有人**。
 - **快速匹配**：房主开放匹配后，其他博士一键加入同难度、未开局、有空座的房间。
+- **插件（0.3.0 起）**：外观 / 界面 / 玩法插件；房主在房间顶部为全房间开启，玩家也可以在「设置」里只给自己开外观与界面插件。插件工作台 `/studio/` 可选模板、按官方名称选目标、试一场并打包。
+- **干员皮肤与官方特效**：每个座位可以给自己的干员选一套皮肤（设置里「显示其他玩家的皮肤」默认打开）；服主提取过官方战斗特效时，设置里可选「官方特效」关 / 精简 / 完整。
 - **局内文字聊天**：左下角聊天框，**Enter 发送**（2 秒冷却、单条上限 80 字）；观战只读；聊天气泡、未读红点。
 - **违禁词过滤**：服务端权威，命中后替换为等长 `*`；词库从服务端配置读取，本仓库只带**示例占位词表**。
 - **对局记录落盘**：每局一份，含参与者与结果，默认保留 **7 天**。
@@ -218,7 +222,7 @@ English summary: [below](#english).
 - **地形与敌人**：阻隔工事、射击台、源石流吹风机、沼泽、排气格栅、涨潮等地形装置；空中与近地悬浮敌人、悬赏敌人。
 - **联防**：有人漏怪、又有人完美作战时，完美作战的队友带着阵容帮忙拦截漏掉的敌人。
 - **最终攻势与隐秘核心**：同队两人共享一个关底战场，共同削减同一条领袖血条（2V2 两队各打各的）；10 个敌方领袖，巨型领袖约 5×3 格的受击范围，以及官方的限伤规则。
-- **结算称号**：卫戍之星、不朽盟约、坚若磐石等 6 个称号。
+- **结算**：官方样式的个人战报和同盟结算页，卫戍认证等级（官方 60 级、每日防卫目标，按本机记录计算）；卫戍之星、不朽盟约、坚若磐石等 6 个结算称号。
 - **断线重连**：断线后座位保留，合作与 2V2 在 10 分钟内、独立狩猎在 24 小时内重新打开页面即可回到原座位；掉线期间作战按原编队由服务器接管，中途退出或「暂离」才交给 AI 托管。
 - **交互细节**：漏怪时顶栏用红字 + 「−N」标记待扣的目标生命值（结算时才扣除）；点选、拖放和配发装备都按地上的方格；购买、升级和机变选卡都需要点两次确认；只有一名玩家时除作战与事件期外不计时（事件期照常计 20 秒）。
 - **画面与声音**：真实 Spine 小人、官方 BGM 与音效、表情（6 套 × 6 个）、作战特效；可选的官方 3D 棋盘（需要从本机客户端提取贴图）。
@@ -228,10 +232,10 @@ English summary: [below](#english).
 
 [Releases](../../releases/latest) 里有两种包，按自己的网络情况选一种：
 
-- **完整包**：附带全部美术 / 音频素材，体积大（约 560 MB，解压后约 790 MB），解压就能玩，不需要再下载任何东西。
-- **精简包** `Hunt-Simulation-v0.0.1-lite.zip`（约 23 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
+- **完整包**：附带全部美术 / 音频素材，体积大（约 800 MB，解压后约 1.16 GB），解压就能玩，不需要再下载任何东西。
+- **精简包** `Hunt-Simulation-v0.0.1-lite.zip`（约 25 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
 
-版本 `V0.0.1（0.2.6）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
+版本 `V0.0.1（0.3.1）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
 
 ## 快速开始
 
@@ -239,8 +243,8 @@ English summary: [below](#english).
 
 [Releases](../../releases/latest) 里有几种整合包，代码和运行依赖完全相同，按需二选一；已经装好旧版本的，升级时只下载更新包即可：
 
-- **完整包** `…-v<版本>.zip`（约 560 MB，解压后约 790 MB）：附带全部美术 / 音频（含中文、日文两套干员语音、官方 3D 棋盘贴图和各战场的官方场景），解压就能玩，不需要再下载任何东西。**推荐。**
-- **精简包** `…-v<版本>-lite.zip`（约 23 MB）：不带素材，第一次启动时自动从公开镜像下载美术、Spine 模型、音频、字体、表情和「玩法说明」教程图（约 550 MB，可中断，再次启动会续传）；官方 3D 棋盘等本地客户端素材不在其中（见下面的「本地客户端素材」；各战场的官方场景可以用 `node tools/setup.mjs --scenes` 在本机下载并提取）。适合下载大文件不方便的情况。
+- **完整包** `…-v<版本>.zip`（约 800 MB，解压后约 1.16 GB）：附带全部美术 / 音频（含中文、日文、英文、韩文和本土语言的干员语音、官方 3D 棋盘贴图、各战场的官方场景和官方战斗特效），解压就能玩，不需要再下载任何东西。**推荐。**
+- **精简包** `…-v<版本>-lite.zip`（约 25 MB）：不带素材，第一次启动时自动从公开镜像下载美术、Spine 模型、音频、字体、表情和「玩法说明」教程图（约 720 MB，可中断，再次启动会续传）；官方 3D 棋盘等本地客户端素材不在其中（见下面的「本地客户端素材」；各战场的官方场景可以用 `node tools/setup.mjs --scenes` 在本机下载并提取）。适合下载大文件不方便的情况。
 - **更新包** `…-v<版本>-update.zip`（大小看改动多少，通常只有几 MB）：只含比之前的版本改动过的文件，用来把已经装好的旧版本升级到新版本，不用重新下载整个包。用法：先停止服务器（关掉窗口；装了开机自启的运行 `scripts\install-service-windows.ps1 -Stop`），把 zip 里程序文件夹的全部内容合并到安装文件夹、覆盖同名文件（Windows 资源管理器里复制粘贴即可；macOS 不要用访达拖放，它会整个替换文件夹，请用 `unzip -o`，见 [docs/DEPLOY.md](docs/DEPLOY.md) 第 1.5 节），再照常启动。启动时会先核对全部程序文件、删除新版本不再用的旧文件，然后正常运行；如果这个文件夹不是更新包对应的版本（或者程序文件被改过），会提示下载完整包，服务器不启动。全新安装请用完整包或精简包。
 
 两种包都只含运行和部署需要的文件（服务器、客户端、数据、启动脚本、setup / doctor / 素材下载工具、许可证与说明、[docs/PLAYING.md](docs/PLAYING.md) 和 [docs/DEPLOY.md](docs/DEPLOY.md)）；测试、开发工具和设计文档只在源码仓库里。
@@ -309,6 +313,17 @@ npm start          # 启动服务器：http://localhost:3000
 
 刷新页面或断线后，合作与 2V2 在 10 分钟内、独立狩猎在 24 小时内重新打开即可回到原座位。服务器把房间和对局都保存在内存里，**重启服务器会结束所有对局**。
 
+## 插件
+
+0.3.0 起支持插件；不开插件时按原版游玩。
+
+- **服主安装**：将插件文件夹放进服务器的 `plugins/`，或用 `node tools/plugin.mjs install <zip路径或HTTPS地址>` 安装；远程地址需要 `--sha256`。工作台也支持从社区目录安装和导入 Forge 工坊包。服主可用 `plugins/config.json` 限定可用插件。
+- **房主开启**：在房间顶部的「原版 / 插件 ×N」面板里选外观或玩法插件、修改插件设置、选择插件模式。玩法插件的内容会由所有玩家下载并校验，房间标为「非官方」，统计总览默认不计入。
+- **玩家个人设置**：「设置 → 外观插件 / 界面插件」只影响自己的浏览器；个人不能另装玩法插件改变房间规则。外观插件只换画面与声音，界面插件只读允许的对局信息。
+- **自己制作**：打开启动窗口 `Studio:` 行的地址，使用 `/studio/` 插件工作台选模板、按官方名称选目标、拖放素材、实时预览、试一场并回放，最后打包分享。工作台限本机和局域网，修改需要钥匙。
+
+脚本执行默认关闭。服主可以用 `SP_PLUGIN_SCRIPTS=sandbox` 开启沙箱脚本（或启动时加 `--scripts sandbox`；Windows 双击 `scripts\start-windows-sandbox.bat`）；原生受信任模式还需审查、固定锁文件哈希和玩家同意，公网部署需 `trusted-force`。开服设置见 [部署指南](docs/DEPLOY.md)，作者从[插件新手指南](docs/PLUGIN-GUIDE.md)开始，格式与限制见[插件参考](docs/PLUGINS.md)，接口列表见[插件 API 表](docs/PLUGIN-API.md)。
+
 ## 联机方式
 
 朋友不在同一个局域网时，下面是几类常见做法，按自己的情况选一种即可。这里只做简单介绍，提到的工具和服务只是举例，本项目与它们没有任何关系，也不做推荐；具体的安装、费用和使用规则请以各自的官方说明为准。部署细节（防火墙、开机自启、反向代理与 HTTPS、Docker）见 **[docs/DEPLOY.md](docs/DEPLOY.md)**。
@@ -337,7 +352,7 @@ npm start          # 启动服务器：http://localhost:3000
 | 出售 / 撤退 / 销毁装备 | 点击单位所在的格子 → 底部按钮「出售 +1」「撤退」；也可以把棋盘上的干员拖回整备区撤退。整备区里的装备与法术只能「销毁」，已配发的装备锁定在干员身上（干员出售或合成精锐时退回整备区） |
 | 装备 | 把装备拖到干员所在的格子上（每人 2 件；满了会弹出替换窗口，被替换的一件会被销毁）；法术拖到地块上并选方向 |
 | 查看详情 | 右键或长按单位 / 卡牌（属性为实时数值，高于基础值为绿色、低于为红色） |
-| 快捷键 | `R` 刷新 · `F` 冻结 · `D` 升级 · `Q` 撤退 / `X` 出售选中的干员 · `Space` 准备就绪 · `Esc` 取消 / 关闭；除 `Esc` 外都可以在「设置 → 快捷键」里改成别的键（[玩法指南 §11](docs/PLAYING.md#11-快捷键)） |
+| 快捷键 | `W` 购买鼠标指向的商品（无需点击） · `R` 刷新 · `F` 冻结 · `D` 升级 · `Q` 撤退 / `X` 出售选中的干员 · `Space` 准备就绪 · `Esc` 取消 / 关闭；除 `Esc` 外都可以在「设置 → 快捷键」里改成别的键（[玩法指南 §11](docs/PLAYING.md#11-快捷键)） |
 | 方向轮盘键盘操作 | 方向键预览 · `Enter` 确认 · `Esc` 取消 |
 | 狩猎期（2V2） | 第 1 步点一名对手（10 秒，队内先到先得）；第 2 步点怪加入队列，**点一下这一行切换上路 / 下路**，**长按拖动**排序；「自动选择」按价值贪心填满预算，「沿用上轮」按本回合预算重新装填 |
 | 坎诺特取钱 | 休整期点金币卡上方的商人头像；面板给 1 / 2 / 4 / 全部四档，每档写明要花多少赏金，点两次确认 |
@@ -347,6 +362,8 @@ npm start          # 启动服务器：http://localhost:3000
 | 查看队友概览 | 观战或准备期查看队友阵地时，底部条显示该干员的**生命 / 等级 / 上场** |
 | 文字大小 | 设置 →「文字大小」：只放大界面文字，棋盘和 HUD 的位置不变 |
 | 画面自动调节 | 设置 →「画面质量」：默认开启；关掉后可分别选 **2D 棋盘（简化平面）/ 3D 棋盘**与**加载 / 不加载角色模型**，立即生效（也可用网址参数 `?board=2d\|3d`、`?render=fallback\|engine`） |
+| 插件（0.3.0 起） | 房主点房间顶部的「原版」→ 选插件、改设置、选插件模式，变成「插件 ×N」；玩家在「设置 → 外观插件 / 界面插件」里可以只给自己开（[插件一节](#插件)） |
+| 干员皮肤 / 官方特效 | 「干员调配」的详情里选皮肤（队友看得到，可在设置里关掉「显示其他玩家的皮肤」）；服主提取过官方特效时，设置 →「官方特效」选关 / 精简 / 完整 |
 | 暂停（独立狩猎） | 作战中（含最终攻势 / 隐秘核心）点顶栏的「暂停」或按 `Space`，再点「继续作战」（或 `Space`）继续；合作与 2V2 的作战不能暂停 |
 | 表情 | 左下角「交流」，左右滑动（或方向键）换主题，冷却 1 秒 |
 | 观战 | 自己的作战结束后（或休整期）点左侧队友头像 →「前往查看」；不参战的朋友可以在大厅输入房间密钥点「观战」（每个房间最多 2 名观战者，本作新增） |
@@ -360,6 +377,7 @@ npm start          # 启动服务器：http://localhost:3000
 |---|---|
 | [CHANGELOG.md](CHANGELOG.md) | 更新记录：每个版本修复了什么、哪些反馈经核实不是问题 |
 | [docs/PLAYING.md](docs/PLAYING.md) | 玩法指南：流程、经济、招募与晋升、摆阵、联防、盟约、最终攻势、2V2 狩猎模拟与同盟狩猎 |
+| [docs/PLUGINS.md](docs/PLUGINS.md) · [docs/PLUGIN-GUIDE.md](docs/PLUGIN-GUIDE.md) | 插件格式、安装与服主策略；中文工作台入门、DSL 和对战试验 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 部署指南：Windows 开服与开机自启、防火墙、组网 / 隧道、反向代理与 HTTPS、Docker、systemd、排错 |
 | [docs/WINDOWS.md](docs/WINDOWS.md) | Windows 便携包：怎么打一份「零安装」包（`scripts/make-windows-bundle.mjs`）、包里放了什么、授权注意事项 |
 | [docs/DESIGN.md](docs/DESIGN.md) | 架构与契约（英文）：索引，按章节号找到文件；现行规则在 `docs/design/`（范围与目录分工、坐标与时间、战斗引擎、对局、网络协议、渲染与 UI），各次试玩和各版本的规则修订与依据在 `docs/history/` |
@@ -442,7 +460,8 @@ An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess t
 - **Three event periods per match** (the drawn start round, +4, and R13): each draws an ally entry — in 2V2, four targets (opponent A / opponent B / teammate / yourself, no target twice in a match) from 24 entries, with E1/E2/E3 odds of 15/45/40, 30/40/30 and 45/30/25 and double magnitude on yourself — plus one of 12 monster entries (35/40/25, 25/40/35, 20/35/45) and a 10–25% elite-attribute subset. Percentages use an event-only multiplicative bucket; flat aspd / SP values go onto the panel first.
 - **Endgame by time:** the two duos share a boss battlefield in R14, each team fights its own leader, and the result is decided by the **4:5 time score** (R14 and R15 remaining-time shares) before shared HP. The R15 Hidden Core threshold is **> 600 layers per team** (2V2). Opponents stay hidden through R13 and are revealed from R14; spectators see everyone from round 1.
 - **Also built in:** in-match text chat with **server-side banned-word filtering**, per-match logs on disk (7-day retention), a **server-wide notice banner**, a **damage / healing board** (healing credited to whoever granted it), a **teammate overview** (HP / level / deployed), **operator asset prefetch**, **quick match**, a **text-size setting**, and a **graphics auto-adjust** mode (2D/3D board + a character-model toggle, with GPU-based auto-downgrade).
-- **Run:** download the full bundle `…-v<version>.zip` (~560 MB, all the art inside, the Chinese and Japanese operator voices and the official battlefield scenes included) from [Releases](../../releases/latest) — or the lite one, `…-v<version>-lite.zip` (~23 MB), which downloads the art (~550 MB) on its first start; the update bundle `…-v<version>-update.zip` holds only the files changed since the earlier releases: stop the server, extract it over an existing install and start again — install Node.js 22 or 24, then double-click `scripts\start-windows.bat` (Windows) or run `./scripts/start.sh` (macOS / Linux) and open <http://localhost:3000>. From source: `git clone https://github.com/T1113047/Stronghold-Protocol-Hunt-Simulation.git`, then `npm install && npm run setup && npm start` (setup downloads ~550 MB of art from public mirrors; the official 3D board and some HUD art come from a local Arknights client — without one the game uses the 2D board and look-alike stand-ins).
+- **Plugins (0.3.0+):** the server owner drops a plugin into `plugins/`; the host opens it for the room from the "原版 / 插件 ×N" panel, while cosmetic and UI plugins can also be enabled per player in Settings. Plugins come from the community or from the built-in studio at `/studio/`.
+- **Run:** download the full bundle `…-v<version>.zip` (~800 MB, all the art inside, the Chinese, Japanese, English, Korean and own-language operator voices, the official battlefield scenes and the official battle effects included) from [Releases](../../releases/latest) — or the lite one, `…-v<version>-lite.zip` (~25 MB), which downloads the art (~720 MB) on its first start; the update bundle `…-v<version>-update.zip` holds only the files changed since the earlier releases: stop the server, extract it over an existing install and start again — install Node.js 22 or 24, then double-click `scripts\start-windows.bat` (Windows) or run `./scripts/start.sh` (macOS / Linux) and open <http://localhost:3000>. From source: `git clone https://github.com/T1113047/Stronghold-Protocol-Hunt-Simulation.git`, then `npm install && npm run setup && npm start` (setup downloads ~550 MB of art from public mirrors; the official 3D board and some HUD art come from a local Arknights client — without one the game uses the 2D board and look-alike stand-ins).
 - **Languages:** Chinese (the default), English, 日本語, 한국어 and 繁體中文 — switch on the title screen or in Settings. Game texts come from the official clients; the Japanese, Korean and Traditional Chinese interface strings are machine translations (corrections welcome: [docs/I18N.md](docs/I18N.md)).
 - **Play with friends:** create a room and share the 4-letter key or the `?room=KEY` link, or open the room to **quick match** so anyone can join a same-difficulty room in one click. On a LAN, use the address printed at start; otherwise use a virtual-LAN tool, a tunnel or a VPS — see [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Disclaimer:** not affiliated with or endorsed by Hypergryph or Yostar. All Arknights names, art, audio, text and data are © their respective owners and are **not** covered by this project's GPL licence. For study and personal non-commercial use only — no selling, paid distribution, paid servers or monetisation of any kind. Content will be removed on request of the rights holders. Provided "as is", without warranty.

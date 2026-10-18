@@ -7,12 +7,12 @@ export function validateSource(mode) {
   return mode;
 }
 
-export async function selectDownloadSource({ mode = 'direct', offline = false, proxyPrefix, log = console.log } = {}) {
+export async function selectDownloadSource({ mode = 'direct', offline = false, proxyPrefix, log = console.log, verified = false } = {}) {
   validateSource(mode);
   if (offline) return 'direct';
   const normalizedProxy = mode === 'mirror' ? normalizeProxyPrefix(proxyPrefix) : '';
   log(mode === 'mirror'
-    ? `[network] 手动开启 GitHub 镜像：${normalizedProxy || '代理已禁用'}；文件仅校验格式和大小。`
+    ? `[network] 手动开启 GitHub 镜像：${normalizedProxy || '代理已禁用'}；${verified ? '原始文件校验 Git blob。' : '文件仅校验格式和大小。'}`
     : '[network] 原始源（未开启 GitHub 镜像）');
   return mode;
 }
@@ -55,19 +55,26 @@ export class MirrorPolicy {
     }
   }
 
-  async readBody(url, response) {
-    if (!this.isProxy(url)) return Buffer.from(await response.arrayBuffer());
+  async readBody(url, response, maxBytes = Infinity) {
+    if (Number(response.headers?.get('content-length')) > maxBytes) {
+      await response.body?.cancel();
+      throw new Error(`JSON exceeds ${maxBytes} bytes`);
+    }
+    if (!this.isProxy(url) && !Number.isFinite(maxBytes)) return Buffer.from(await response.arrayBuffer());
     if (!response.body) return Buffer.alloc(0);
     const reader = response.body.getReader();
     const chunks = [];
     let size = 0;
     try {
-      while (true) {
-        const { value, done } = await readChunk(reader, this.timeoutMs, this.abortMirror.signal);
+      while (true) { // loop-cap: response EOF, maxBytes for bounded JSON, and body idle deadline
+        const { value, done } = this.isProxy(url)
+          ? await readChunk(reader, this.timeoutMs, this.abortMirror.signal)
+          : await readChunk(reader, this.timeoutMs);
         if (done) break;
         const chunk = Buffer.from(value);
-        chunks.push(chunk);
         size += chunk.length;
+        if (size > maxBytes) throw new Error(`JSON exceeds ${maxBytes} bytes`);
+        chunks.push(chunk);
       }
     } catch (error) {
       try { await reader.cancel(error); } catch { /* ignore */ }

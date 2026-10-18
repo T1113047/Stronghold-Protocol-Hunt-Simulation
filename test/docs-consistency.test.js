@@ -348,7 +348,7 @@ test('user playtest #4 (DESIGN §18): picking by tile, timers, 机变 two taps, 
   const special = DATA.items.chess_item_4_09_e_a;
   assert.ok(special.shopExcluded && special.shopExcludedBy, '灼燃维式重锤 is never sold');
   assert.match(dataRow('shopExcluded`, `shopExcludedBy'), /isShopItem/);
-  assert.match(PLAYING, /突变细胞只来自昆图斯的策略/);
+  assert.match(PLAYING, /突变细胞来自昆图斯的策略，也会出现在凯瑟琳【定向投放】里（调度中心仍不出售）/);
   // (#11 revisited by user playtest #6: the drone is a hand piece again, still only on the field when her skill fires)
   assert.equal(DATA.tokens.token_10000_silent_healrb.placeable, true, '赫默\'s drone is a hand piece (user playtest #6)');
   assert.match(dataRow('displayType`, `placeable'), /manually deployable summon/);
@@ -484,7 +484,7 @@ test('user playtest #6 (DESIGN §20): summons, skill triggers, blocking, push fo
   assert.equal(ASPD_MIN, 20);
   assert.match(sec(5), /`aspd = clamp\(100 \+ Σaspd \+ base-100, 20, 600\)`/);
   assert.match(sec(5), /isolated \(孤立: no friendly selector picks it/);
-  assert.match(sec(5), /`battle\.push\(e, force, \{ from, dir, fixed, fixedAngle, inward, effect \}\)`/);
+  assert.match(sec(5), /`battle\.push\(e, force, \{ from, dir, fixed, fixedAngle, inward, effect, keepDir \}\)`/);
   assert.match(sec(19), /锏 S3 归于宁静 \(added by §20\.3\)/);
   // #5: the boss pool floor and the verdict (code = §5.5 = §14 = §6.1)
   assert.equal(BOSS_POOL_MIN_HP, 1);
@@ -708,7 +708,7 @@ test('player feedback after 0.1.0 (DESIGN §21, v0.1.1): every report mapped, th
   assert.match(sec(8), /`m\.ticker \{text, id, type, priority, playerId\}`/);
   assert.match(META, /The strip queues by `priority`, highest first/);
   // UnitInfo / unitStats / rewardOffer shapes (§8)
-  assert.match(sec(8), /skillIndex\?, moduleId\?, items\?, form\? \}/);
+  assert.match(sec(8), /skillIndex\?, moduleId\?, items\?, form\?, skin\? \}/);
   assert.match(sec(8), /moveSpeed, range\?, base: \{…same\}\}/);
   assert.match(sec(8), /rewardOffer: null \| \{ tier, source: 'merge'\|'special', label, queued, slots/);
   // §6.6 describes the new bot; the old one-liner is gone
@@ -849,7 +849,8 @@ test('the deliberate trigger deviation (DESIGN §21.29): six 重装 skills DEFAU
   assert.match(DESIGN, /\*\*partly reverted by §21\.29\*\*/);
   assert.match(DESIGN, /\| Six 重装 skills' trigger \(§21\.29\) \|/);
   // the builder's table is per chess (灰毫 S1 is the generic skcom_atk_up[3]) and the data follows it
-  const bd = doc('tools/build-data.mjs');
+  assert.match(doc('tools/build-data.mjs'), /import \{ createOfficialUnitBuilders \} from '\.\.\/server\/plugins\/officialUnitBuilder\.js'/);
+  const bd = doc('server/plugins/officialUnitBuilder.js');
   assert.match(bd, /const TRIGGER_DEVIATIONS = Object\.freeze\(\{/);
   for (const k of ["chess_char_1_04_a: { skchr_udflow_2: 'DEFAULT' }", "chess_char_1_20_a: { skchr_liskam_2: 'DEFAULT' }", "chess_char_2_18_a: { 'skcom_atk_up[3]': 'DEFAULT', skchr_ashlok_2: 'DEFAULT' }", "chess_char_5_08_a: { skchr_horn_2: 'DEFAULT', skchr_horn_3: 'DEFAULT' }"]) assert.ok(bd.includes(k), k);
   for (const id of ['chess_char_1_04_b', 'chess_char_2_18_b', 'chess_char_5_08_b']) {
@@ -920,7 +921,11 @@ test('干员战斗语音 (DESIGN §21.30): the manifest data, the official prior
   assert.equal(manifest.stats.voiceJpChars, charIds.length);
   assert.match(doc('docs/ASSETS.md'), /voiceJp: \{ \[charId\]: \{ …the slots of `voice` \} \}/);
   assert.match(doc('docs/DEPLOY.md'), /`FULL_ZIP_JP_VOICE` 改成 `false` 时/);
-  assert.match(PLAYING, /「语音语言」选 \*\*中文 \/ 日本語\*\*（默认中文，和界面语言无关/);
+  assert.match(doc('docs/ASSETS.md'), /voiceEn\?: \{ \[charId\]: \{ …the slots of `voice` \} \}/);
+  assert.match(doc('docs/ASSETS.md'), /voiceNativeLangType\?: \{ \[charId\]:/);
+  assert.match(doc('docs/DEPLOY.md'), /`FULL_ZIP_OPTIONAL_VOICE`/);
+  assert.match(doc('docs/DEPLOY.md'), /5712 个文件，约 169 MB，zip 后约 157 MB/);
+  assert.match(PLAYING, /「语音语言」选 \*\*中文 \/ 日本語 \/ English \/ 한국어\*\*（默认中文，和界面语言无关/);
   assert.match(PLAYING, /会说一句官方的「选中干员」语音，休整期也一样/);
   assert.match(SIM, /\['engage', id\]/);
   // the code: every slot the client asks for comes from a running battle's own stream — the three prep-only lines

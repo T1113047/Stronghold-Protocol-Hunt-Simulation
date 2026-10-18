@@ -47,9 +47,14 @@ test('missing data/local-assets.json → 200 empty manifest (no 404 on installs 
     const h = await get(srv, '/data/local-assets.json', 'HEAD');
     assert.equal(h.status, 200);
     assert.equal(h.body, '');
+    // the official effects' file list (data/local-fx.json, DESIGN §33.1): the same empty stand-in
+    const fx = await get(srv, '/data/local-fx.json');
+    assert.equal(fx.status, 200);
+    assert.deepEqual(JSON.parse(fx.body).groups, {});
     // other missing data files still 404
     assert.equal((await get(srv, '/data/nope.json')).status, 404);
     assert.equal((await get(srv, '/data/sub/local-assets.json')).status, 404);
+    assert.equal((await get(srv, '/data/sub/local-fx.json')).status, 404);
   } finally {
     srv.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -97,7 +102,11 @@ test('docs and messages say what falls back without the local art and how a serv
   assert.equal(localGaps({ enemySpines: true, tokenSpines: true }), '');
   assert.equal(localGaps({ enemySpines: true, tokenSpines: false }), '，缺少新版的自选召唤物模型');
   assert.equal(localGaps({ enemySpines: false, tokenSpines: false }), '，缺少新版的灼热/炽焰源石虫模型和自选召唤物模型');
-  assert.match(read('tools/setup.mjs'), /\$\{localGaps\(local\)\}（重新提取：--local）/);
+  const setupSrc = read('tools/setup.mjs');
+  assert.match(setupSrc, /localGaps\(local/);
+  assert.match(setupSrc, /（重新提取：--local）/);
+  // a non-empty gap already names --local; the fresh-extract hint is not glued on after it
+  assert.match(setupSrc, /\$\{gap\}\$\{gap \? '' : again\}/);
   const readme = read('README.md');
   assert.match(readme, /召唤物/);
   assert.match(readme, /表情和「玩法说明」的教程图随上面的素材一起从公开镜像下载/);

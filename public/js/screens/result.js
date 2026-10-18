@@ -8,6 +8,12 @@
 // (left = 队伍 / 排名 / 回合, right = 赏金与金币), then the per-player cards — every area scrolls inside itself and the
 // screen itself never overflows. Text reads the text root `--t` (设置 →「文字大小」).
 //
+// The same view is the stats page's re-view of a stored match (screens/stats.js hands it the payload
+// `recordToResult` rebuilt; `quiet`: no settlement jingle) and the 数据详情 under the settlement flow
+// (screens/settle.js). `content`: the room's content (room.state.content, or a stats record's) — gameplay
+// plugins mark the result unofficial (DESIGN §32.6). `slot`: the 结算 tab plugin slot (result.tab) — false
+// where the page under it has one.
+//
 // Expected m.result (free-form in DESIGN §8.2; fields read tolerantly, see gameLogic.normalizeResult):
 //   { victory, roundsPassed, lastRound?, hiddenReached?, hiddenCleared?, bossId?, hiddenBossId?, difficulty?, modeId?,
 //     durationMs?, teamLp?, versus?: { winnerTeam, doubleLoss, timeTie?, timeWeights?: { r14, r15 },
@@ -40,10 +46,12 @@ import { useGameData, Img, UnitThumb, BandIcon, PlayerAvatar, BondGlyph, LpTower
 import { normalizeResult, fmtNum, diyRecordFor, cardStandIn, standInForText } from '../ui/gameLogic.js';
 import { data } from '../data.js';
 import { enemyIconUrl, titleIconUrl, uiUrl } from '../ui/assetUrls.js';
-import { store, useStore, emptyMatch } from '../store.js';
 import { audio } from '../audio.js';
 import { sentText } from '../ui/lang.js';
+import { store, useStore, emptyMatch } from '../store.js';
 import { teamOfSeat } from '../../../shared/constants.js';
+import { UnofficialMark } from '../ui/pluginTag.js';
+import { TestMark } from '../ui/testConsole.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -440,11 +448,13 @@ export function ResultScreen() {
 }
 
 /**
- * The settlement view of one m.result payload — the live screen above, and the stats page's re-view of a stored match
- * (screens/stats.js, which hands it the payload recordToResult rebuilt; `quiet`: no settlement jingle).
- * @param {{ res: any, pub?: any, myId?: string|null, backLabel: string, onBack: () => void, quiet?: boolean }} props
+ * The settlement view of one m.result payload — the live flow's 数据详情 (screens/settle.js), and the stats page's
+ * re-view of a stored match (screens/stats.js, which hands it the payload recordToResult rebuilt; `quiet`: no settlement
+ * jingle). `content`: the room's content (room.state.content, or a stats record's) — gameplay plugins mark the result
+ * unofficial (DESIGN §32.6). `slot`: the 结算 tab plugin slot (result.tab) — false where the page under it has one.
+ * @param {{ res: any, pub?: any, myId?: string|null, backLabel: string, onBack: () => void, quiet?: boolean, content?: any, slot?: boolean }} props
  */
-export function ResultView({ res, pub = null, myId = null, backLabel, onBack, quiet = false }) {
+export function ResultView({ res, pub = null, myId = null, backLabel, onBack, quiet = false, content = null, slot = true }) {
   const gd = useGameData();
   const r = normalizeResult(res, pub);
   const raw = isObj(res) ? res : {};
@@ -505,9 +515,12 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         <div class="result__brand">
           <div class="result__logo"><${Sprite} k="entry/season_logo_settle" class="result__logoimg" fallback=${html`<${MicroLabel} tone="mint">STRONGHOLD PROTOCOL</${MicroLabel}>`} /></div>
           ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
+          <${UnofficialMark} room=${content ? { content } : null} class="result__modmark" />
         </div>
         <div class="result__verdict">
           <h1 class="result__headline" data-testid="result-headline">${verdict.headline}</h1>
+          ${res?.test === true ? html`<p class="result__test" data-testid="result-test"><${TestMark} /> ${t('测试对局')}${Number.isInteger(res.testActions) ? html` · ${t('测试指令 {n} 次', { n: res.testActions })}` : null}</p>
+            <p class="t-dim">${t('本局为测试对局，不计入统计、成就、称号、徽章与卫戍认证。')}</p>` : null}
           <p class="result__sub" data-testid="result-verdict-sub">${verdict.sub}</p>
         </div>
         <div class="result__rounds" data-testid="result-rounds">
@@ -561,6 +574,7 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         ${r.players.length ? players.map((p) => html`<${PlayerCard} key=${p.playerId} p=${p} myId=${myId} titles=${titles} best=${best} solo=${players.length < 2} />`)
           : html`<p class="t-dim">${t('暂无结算数据')}</p>`}
       </section>
+      ${slot ? html`<div class="ui-slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>` : null}
       <footer class="result__foot">
         <${Button} variant="primary" size="xl" icon="chevronLeft" onClick=${onBack}>${backLabel}<//>
       </footer>

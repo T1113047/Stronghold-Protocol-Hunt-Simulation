@@ -5,7 +5,7 @@
 //   res           = clamp((base + Σflat) × Πmul, 0, 100)
 //   aspd          = clamp(base + Σaspd, 20, 600)          (base is 100 for almost everyone; floor 20 = PRTS 数值范围)
 //   interval      = bat × (1 + ΣbatPct) × 100 / aspd      (ΣbatPct floored at −0.9)
-//   moveSpeed     = (base + ΣmoveFlat) × ΠmoveMul          (tiles/s = moveSpeed × MOVE_SCALE)
+//   moveSpeed     = max(mem.moveSpeedFloor ?? 0, (base + ΣmoveFlat) × ΠmoveMul)   (tiles/s = moveSpeed × MOVE_SCALE)
 //   massLevel     = max(0, base + ΣmassFlat)                (重量: displacement, 浮空 halving; 失重 = massFlat −1)
 // Changing maxHp keeps the HP ratio. The sim keeps floats; rounding happens only in snapshots.
 
@@ -38,6 +38,10 @@ export class Unit {
     this.name = init.name ?? init.def?.name ?? this.defId;
     this.ownerId = init.ownerId ?? null;  // playerId (enemies: field owner)
     this.uid = init.uid ?? null;          // match piece uid (ops/tokens from the board)
+    // 干员皮肤 (docs/SKINS.md): the owning player's chosen skinId, carried from PlayerBattleInput.skin through
+    // _makeAlly; snapshot's unitInfo puts it on the wire so every client draws that player's model. null = default.
+    // Display only: no rule reads `this.skin`, and Battle.result() does not include it.
+    this.skin = init.skin ?? null
     this.ownerUnit = init.ownerUnit ?? null; // summoner (tokens)
     this.x = init.x ?? 0;
     this.y = init.y ?? 0;
@@ -66,6 +70,9 @@ export class Unit {
     this.removed = false;       // permanently gone (enemies, tokens, retreated-for-good)
     this.blocking = [];         // ops: enemies currently blocked
     this.blockedBy = null;      // enemies: blocker unit
+    // enemies: listed on more than one tile of the per-tick range index (their 0.1 collider straddles an edge —
+    // battle/queries.js _buildEnemyIndex); declared here so the index writing it never changes a unit's shape
+    this._ebMulti = false;
     this.motion = init.motion ?? 'GROUND'; // enemies: 'WALK' | 'FLY'
     this.profile = null;        // resolved profession/attack profile
     this.skill = null;          // SkillRuntime
@@ -150,7 +157,7 @@ export class Unit {
       maxHp, atk, def, res, aspd, bat,
       interval: (bat * 100) / aspd,
       blockCnt: Math.max(0, fin(Math.round(b.blockCnt + a('blockCnt')), 0)),
-      moveSpeed: Math.max(0, fin((b.moveSpeed + a('moveFlat')) * m('moveMul'), fin(b.moveSpeed, 0))),
+      moveSpeed: Math.max(this.mem.moveSpeedFloor ?? 0, fin((b.moveSpeed + a('moveFlat')) * m('moveMul'), fin(b.moveSpeed, 0))),
       rangeExtend: Math.max(0, Math.round(a('rangeExtend'))),
       // 阻挡半径倍率 − 1 (PRTS 数值范围 BLOCK_RADIUS_SCALE "影响阻挡模式为飞行阻挡的单位的阻挡半径"): Battle._checkBlock
       blockRadiusScale: Math.max(0, fin(a('blockRadiusScale'), 0)),

@@ -2,7 +2,7 @@
 //
 // Handlers validate → mutate → recompute bonds → mark the private view dirty. They never throw on bad input; they
 // return `{ ok: true }` or `{ error: ERR.*, detail? }`. Rules (research 00-INDEX §3–§4, 01 A1, 04 §2):
-//   * Hand (整备区) 10 slots filled right→left, temp (临时整备区) 5 slots. A full hand refuses buys and reward picks —
+//   * Hand: 10 slots filled right-to-left; temp: an expandable queue with five visible slots. A full hand refuses buys and reward picks —
 //     also one that would complete a merge at once (PRTS 卫戍协议/帮助 §手牌区 "例如招募/购入等通常情况下会增加手牌的操作";
 //     GitHub #82) — and withdrawals, except one whose own summon stack frees a slot. Passive gains (merge results,
 //     grants, returned equipment) overflow into temp, and a free hand slot pulls them back in at once, right→left
@@ -40,7 +40,7 @@
 //   * Transformations (transformChess, 突变细胞 — PRTS 备注 "生效时，原干员销毁，获得一名高一阶的随机初始干员"): a destroy
 //     followed by a gain. The carrier leaves wherever it stands (a board tile is freed, the deploy count drops), its
 //     equipment — the cell included — returns to the hand first (overflow temp), then the new chess is gained like any
-//     other (acquireChess: hand, overflow temp, the no-room rule; a merge it completes puts the elite on a consumed
+//     other (acquireChess: hand, overflow temp queue; a merge it completes puts the elite on a consumed
 //     deployed copy's tile — never the carrier's —, else in the hand). Official footage: the tile is empty at the next
 //     prep and the new operator waits in the 整备区 (pointed out in PR #2).
 //   * Items: equip max 2 (a 3rd replaces the equipped item the player picks — g.equip replaceUid, the oldest when
@@ -62,8 +62,8 @@
 //     owner's facing); a swap with its owner is checked from the owner's new tile, and one an in-place re-orientation
 //     (or a promotion) leaves outside goes back onto its stack (recompute → _liftOutOfRange) [ASSUMED: kept when still
 //     inside]. A re-orientation that would leave such a summon with no stack and no free hand / temp slot is refused
-//     (HAND_FULL); elsewhere (a promotion, an owner moved with no room) it leaves the board and its stack comes back at
-//     the next round start (grantTokensFor) — no out-of-range placement reaches the battle.
+//     (HAND_FULL); elsewhere (a promotion, an owner moved with no room) it leaves the board and its stack joins
+//     the expandable temp queue — no out-of-range placement reaches the battle.
 //   * Facing (DESIGN §3, research 09 §1.2): every board piece has `dir` ∈ UP|RIGHT|DOWN|LEFT (server/sim/dir.js), set
 //     by g.move {…, dir} (absent ⇒ RIGHT) and kept across rounds. g.move onto the piece's OWN tile re-orients it in
 //     place; a swap keeps the occupant's dir; a piece put on the board by an effect (a merge elite taking a consumed
@@ -95,9 +95,10 @@
 //     player's data view: the slotted slots' ids (normal and elite) are the composed 自选 records, so the player's piece
 //     of a slot is the operator for every rule (name, class, position, bonds from its factions, no 特质, the pick's skill
 //     and module; tier, price, sell price and the 3 → elite merge are the slot's). Each slotted piece has its own stock
-//     (8 at tier 5, 5 at tier 6 [ASSUMED]; none when every bond of it is banned this match) and joins this player's shop
-//     rolls once the 调度中心 reaches the slot's level; it never enters the shared pool. battleInput carries `diy` (the
-//     pick), m.private exposes `diy` (and `diyBanned`), the scouting views draw the operator with its pick.
+//     (8 at tier 5, 5 at tier 6 [ASSUMED]; twice that in co-op, like the shared pool — GitHub #650; none when every bond
+//     of it is banned this match) and joins this player's shop rolls once the 调度中心 reaches the slot's level; it never
+//     enters the shared pool. battleInput carries `diy` (the pick), m.private exposes `diy` (and `diyBanned`), the
+//     scouting views draw the operator with its pick.
 //
 // Code layout: this file keeps the constructor (the per-player state fields); the methods live in
 // server/match/player/, one module per concern, and are installed on PlayerState.prototype below in a fixed order,
@@ -137,7 +138,7 @@ import { PlayerDiy, DiyStock } from './player/diy.js';
 export class PlayerState {
   /**
    * @param {import('./Match.js').Match} m owning match
-   * @param {{ seat: number, playerId: string, name: string, isBot: boolean, connected: boolean, loadout?: any, notOwned?: any, diy?: any }} seat
+   * @param {{ seat: number, playerId: string, name: string, isBot: boolean, connected: boolean, loadout?: any, notOwned?: any, diy?: any, skins?: any }} seat
    */
   constructor(m, seat) {
     this.m = m;
@@ -201,7 +202,14 @@ export class PlayerState {
     this.diyStock = new DiyStock();
     /** slotted slots without stock: every bond of the operator is switched off this match */
     this.diyBanned = Object.freeze([]);
-    if (!this.isBot && seat.diy) this.setDiy(seat.diy);
+    // A modded room's content list (Match.diyKitted) is what the lobby already accepted. Without it setDiy
+    // keeps the vanilla kit list and drops a plugin operator with no error (checkDiyPicks is lenient).
+    // Bots never slot 自选; they read the human's composed records once this succeeds (bot.js chessRec).
+    if (!this.isBot && seat.diy) this.setDiy(seat.diy, this.m.diyKitted ? { kitted: this.m.diyKitted } : undefined);
+    /** 皮肤 (docs/SKINS.md): frozen `{ [charId]: skinId }`, {} = every operator on its default model. Unlike the
+     * loadout these are PUBLIC (a teammate sees your skin), so they travel in Match.publicView().players[]. */
+    this.skins = Object.freeze({});
+    if (!this.isBot && seat.skins) this.setSkins(seat.skins);
     this.shop = { level: 1, upgradePrice: this.gd.upgradeBase(1) ?? 0, slots: [], frozen: false, freeRefreshes: 0 };
     /** reward offers queue (merge rewards, special refreshes): { tier, source, label, slots: [{ kind, id, price, sold }] } */
     this.offers = [];
@@ -237,7 +245,7 @@ export class PlayerState {
      * @type {null | { id: string, round: number, sourceItemId: string, cards: any[] }}
      */
     this.personalChoice = null;
-    /** free-form counters for content (ctx.counter / setCounter) */
+    /** free-form match-long content counters (ctx.counter / setCounter), including band:cathy:cellTaken (#677) */
     this.counters = {};
     /** per-round counters (reset at round start) */
     this.round = { refreshes: 0, buys: 0, sells: 0, spent: 0, gainedChess: 0, arts: 0, eventRefreshes: 0 };
@@ -269,6 +277,7 @@ export class PlayerState {
       goldPerRound: 0, bountyGold: 0, enemySpeedMul: 1, refreshDiscount: 0, refreshUses: 0, sellDiscount: 0,
     };
     this.eliminatedRound = null;
+    this.creditedKills = 0;
     this.lpAtFinal = null;
     /** last combat result for this player (unite carry state, bounties) */
     this.lastResult = null;

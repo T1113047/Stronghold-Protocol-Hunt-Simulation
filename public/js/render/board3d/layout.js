@@ -8,6 +8,8 @@
 // `raised` / `raisedDecal` repeat only the device slabs — 射击台, 特制水上平台, 封印的地面 — with their side faces
 // reaching below the ground: those are runtime devices that an official scene (scene.js) does not contain, so they are
 // drawn on it (GitHub #569). The 'h' high ground is part of the scenes (act2 m01 / m02 model it) and is not repeated.
+// With `platformMesh` the 射击台 get no slab at all: scene.js draws the official model (trap_1106_achplat) on both
+// boards; the slab stays the fallback without the local art.
 // `devices` = the active stage devices standing on a built tile — separator walls included (act2 m01's blowers: the
 // row-13 ones at the top edge of the normal / 联防 field, the row-6 ones at its bottom edge and at the top edge of the
 // Final Assault field — user playtest #5 item 6 and its follow-up).
@@ -317,7 +319,8 @@ function sideFace(g, uvTable, surfName, dir, x0, x1, y0, y1, zb, zt, colBottom, 
 /**
  * Build the whole board of a stage.
  * @param {any} stage data/stages.json entry
- * @param {{ uv?: object, devices?: boolean }} [opts] uv = resolveUvTable(tiles.json) (defaults to the built-in table)
+ * @param {{ uv?: object, devices?: boolean, platformMesh?: boolean }} [opts] uv = resolveUvTable(tiles.json) (defaults
+ *   to the built-in table); platformMesh: the 射击台 are drawn with the official model (scene.js), so they get no slab
  */
 export function buildBoard(stage, opts = {}) {
   const uvTable = opts.uv || null;
@@ -447,6 +450,7 @@ export function buildBoard(stage, opts = {}) {
 
   const devices = opts.devices === false ? [] : stageDevices(stage, grid);
   for (const d of devices) {
+    if (d.kind === 'platform' && opts.platformMesh) continue;
     if (d.kind === 'platform' || d.kind === 'sealedFloor' || d.kind === 'waterPlatform') {
       slabDevice(board, decal, UVT, d, grid);
       slabDevice(raised, raisedDecal, UVT, d, grid, RAISED_FOOT);
@@ -556,8 +560,8 @@ export function objToBoard(obj, s = 1) {
 
 /**
  * Box-project UVs of a (board-space) mesh onto atlas surfaces: faces pointing up take `top`, the others `side`
- * (mapped across the face's horizontal extent × height). Used for the official crate mesh (s_common_box_01), whose
- * own material is assigned at runtime by the client.
+ * (mapped across the face's horizontal extent × height). Kept for the legacy s_common_box_01 fallback and mounds;
+ * the extracted 阻隔工事 (trap_1105_accrate) uses its authored UVs instead.
  */
 export function boxProjectUV(mesh, top, side) {
   const p = mesh.position, n = mesh.normal;

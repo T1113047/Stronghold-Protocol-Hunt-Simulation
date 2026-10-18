@@ -2,9 +2,9 @@
 //
 //   const THREE = await loadThree()            // '/vendor/three.module.js' (tools/vendor.mjs), null when missing
 //   const pack = await loadBoardPack(assets)   // null when the board art is not installed (→ 2D board)
-//   → { key, images: { D, N?, R?, E?, common?, commonE?, BG?, wind?, gate?, waterN?, caustics?, noise? },
-//       meshes: { crate?, blower?, bgPlane?, gate: { startDown?, startUp?, startBack?, endDown?, endUp? } },
-//       tiles, uv, materials: { theme?, fx? } }
+//   → { key, images: { D, N?, R?, E?, common?, commonE?, BG?, wind?, gate?, waterN?, caustics?, noise?, platform?, crate? },
+//       meshes: { crate?, box?, platform?, blower?, bgPlane?, gate: { startDown?, startUp?, startBack?, endDown?, endUp? } },
+//       tiles, uv, materials: { theme?, fx?, trap? } }
 //   const scene = await loadScenePack(assets, stageId)   // the stage's official scene (tools/local-extract/scenes.py),
 //   → { key, stage, doc, chunks: [{ material, lightmap, group, bounds, position, uv, uv1, normal, color, index }],
 //       groups: { name: [x0, y0, x1, y1] }, images: { tex: { name: img }, lm: [img|null] } }     null when not extracted
@@ -69,12 +69,16 @@ export const PACK_IMAGES = Object.freeze({
   waterN: ['map/water', '[ucp]TX_water_normal'],
   caustics: ['map/water', 'TX_Caustics256'],
   noise: ['map/water', 'T_noise_clouds_01'],
+  platform: ['mesh/trap_110', 'TX_trap_1106_achplat'],
+  crate: ['mesh/trap_110', 'TX_trap_1105_accrate'],
 });
 
 export const PACK_MESHES = Object.freeze({
-  crate: ['mesh/s_common_box_01', 'pCube2'],
+  crate: ['mesh/trap_110', 'trap_1105_accrate'],
+  box: ['mesh/s_common_box_01', 'pCube2'],
   blower: ['mesh/s_wind_device', 'S_wild_wind_device'],
   bgPlane: ['mesh/s_background_common', 'pPlane1'],
+  platform: ['mesh/trap_110', 'trap_1106_achplat'],
 });
 
 /** The official gate / objective boxes: prefab node → pack slot (meshes resolved through map/fx/prefab.json). */
@@ -124,11 +128,12 @@ export function loadBoardPack(assets) {
     }));
     if (!images.D) return null;
     const dir = dUrl.replace(/\/[^/]*$/, '');
-    const [tiles, theme, fxMats, fxPrefab] = await Promise.all([
+    const [tiles, theme, fxMats, fxPrefab, trapMats] = await Promise.all([
       fetchJson(`${dir}/tiles.json`),
       (async () => { const u = url('map/autochess', 'materials'); return u ? fetchJson(u) : null; })(),
       (async () => { const u = url('map/fx', 'materials'); return u ? fetchJson(u) : null; })(),
       (async () => { const u = url('map/fx', 'prefab'); return u ? fetchJson(u) : null; })(),
+      (async () => { const u = url('mesh/trap_110', 'materials'); return u ? fetchJson(u) : null; })(),
     ]);
     const meshes = { gate: {} };
     await Promise.all(Object.entries(PACK_MESHES).map(async ([k, [g, n]]) => {
@@ -149,7 +154,7 @@ export function loadBoardPack(assets) {
     return {
       key: `${dUrl}#${tiles?.version || 0}`,
       images, meshes, tiles: isObj(tiles) ? tiles : null, uv: resolveUvTable(isObj(tiles) ? tiles : null),
-      materials: { theme: isObj(theme) ? theme : null, fx: isObj(fxMats) ? fxMats : null },
+      materials: { theme: isObj(theme) ? theme : null, fx: isObj(fxMats) ? fxMats : null, trap: isObj(trapMats) ? trapMats : null },
     };
   })().catch((err) => { console.warn('[board3d] art load failed', err); return null; }).then((pack) => {
     // A timeout / failed atlas is not proof the host lacks 3D art. A later mount or visibility change may retry.
@@ -202,7 +207,28 @@ export function parseSceneChunks(doc, buf) {
  * @param {{ kind?: string }|null} info scene.json materials[name]
  */
 export function sceneMaterialKey(chunk, info) {
-  return `${chunk?.material}|${info?.kind === 'water' ? '' : chunk?.lightmap}`;
+  return `${chunk?.material}|${info?.kind === 'water' || isSceneWater(info, chunk?.material) ? '' : chunk?.lightmap}`;
+}
+
+/** Surface water, not the DynamicWaterTile platform decal (both were extracted as kind: water). */
+export function isSceneWater(info, name = '') {
+  if (!isObj(info)) return false;
+  const shader = typeof info.shader === 'string' ? info.shader : '';
+  if (shader.endsWith('/DynamicWaterTile')) return false;
+  return shader.endsWith('/StylizedWater') || /_water\d*$/i.test(name);
+}
+
+/**
+ * Pick this map's water record by shader, then by name, never by a theme-specific name. An explicit surface pick
+ * wins. [ASSUMED] With several surfaces the board takes the first StylizedWater; each scene mesh keeps its own
+ * record (including water2). No surface record → null, so the caller restores the procedural water defaults.
+ */
+export function sceneWaterInfo(doc) {
+  const mats = isObj(doc?.materials) ? doc.materials : {};
+  const name = doc?.waterMaterial;
+  if (typeof name === 'string' && isSceneWater(mats[name], name)) return mats[name];
+  const entries = Object.entries(mats).filter(([n, info]) => isSceneWater(info, n));
+  return entries.find(([, info]) => typeof info.shader === 'string' && info.shader.endsWith('/StylizedWater'))?.[1] || entries[0]?.[1] || null;
 }
 
 /**
@@ -288,8 +314,10 @@ export async function sceneListed(assets, stageId) {
 }
 
 /**
- * Load a stage's official scene (scene.json + scene.bin + lightmap pages + albedo textures). A missing texture or
- * lightmap page only drops that map; a missing or malformed scene gives null (→ the procedural board).
+ * Load a stage's official scene (scene.json + scene.bin + lightmap pages + the materials' albedo and emission
+ * (`images.tex`, sRGB) and normal / metallic-gloss (`images.data`, linear) textures + the reflection atlas
+ * `images.env`). A missing texture, lightmap page or atlas only drops that map; a missing or malformed scene
+ * gives null (→ the procedural board). scene.json `version` stays the mesh layout (SCENE_VERSION).
  * @returns {Promise<object|null>}
  */
 export function loadScenePack(assets, stageId) {
@@ -309,15 +337,19 @@ export function loadScenePack(assets, stageId) {
       return i && (i.width || i.naturalWidth) > 0 ? i : null;
     };
     const mats = isObj(doc.materials) ? doc.materials : {};
-    const names = [...new Set(Object.values(mats).map((m) => (isObj(m) && typeof m.map === 'string' ? m.map : null)).filter(Boolean))];
+    const namesOf = (...keys) => [...new Set(Object.values(mats).flatMap((m) => keys.map((k) => (isObj(m) && typeof m[k] === 'string' ? m[k] : null))).filter(Boolean))];
+    const names = namesOf('map', 'emissionMap'), dataNames = namesOf('normalMap', 'glossMap');
     const pages = Math.max(0, Math.min(16, doc.lightmaps | 0));
-    const [texList, lm] = await Promise.all([
+    const [texList, dataList, lm, env] = await Promise.all([
       Promise.all(names.map((n) => img(url(SCENE_TEX_GROUP, n)))),
+      Promise.all(dataNames.map((n) => img(url(SCENE_TEX_GROUP, n)))),
       Promise.all(Array.from({ length: pages }, (_, i) => img(url(group, `lm${i}`)))),
+      isObj(doc.env) ? img(url(group, 'env')) : null,
     ]);
-    const tex = {};
+    const tex = {}, data = {};
     names.forEach((n, i) => { if (texList[i]) tex[n] = texList[i]; });
-    return { key: `${url(group, 'scene')}#${doc.binBytes | 0}`, stage: stageId, doc, chunks, groups: sceneGroupRects(chunks), images: { tex, lm } };
+    dataNames.forEach((n, i) => { if (dataList[i]) data[n] = dataList[i]; });
+    return { key: `${url(group, 'scene')}#${doc.binBytes | 0}`, stage: stageId, doc, chunks, groups: sceneGroupRects(chunks), images: { tex, data, lm, env } };
   })().catch((err) => { console.warn('[board3d] scene load failed', err); return null; }).then((pack) => {
     if (!pack && sceneCache.get(stageId) === pending) sceneCache.delete(stageId);
     return pack;

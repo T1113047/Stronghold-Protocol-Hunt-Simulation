@@ -5,12 +5,12 @@ import { N_ } from './i18n.js';
 export const PROTOCOL_VERSION = 1;
 /** Release version shown to players (title screen, server banner, /healthz). Kept equal to package.json "version"
  * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number. */
-export const APP_VERSION = '0.2.6';
+export const APP_VERSION = '0.3.1';
 /**
  * This fork's own build label: the 2V2 mode's version on top of the upstream release it is built from. The FIRST public
- * test build is `V0.0.1（0.2.6）` (2V2 mode V0.0.1 on upstream 0.2.6). `APP_VERSION` itself stays the upstream release
- * (test/version.test.js ties it to package.json / package-lock / CHANGELOG), so the fork carries its number beside it
- * (title screen, lobby, server banner). The name is an i18n msgid (public/i18n/*.json).
+ * test build was `V0.0.1（0.2.6）`; this tree carries the same mode version on upstream 0.3.1. `APP_VERSION` itself stays
+ * the upstream release (test/version.test.js ties it to package.json / package-lock / CHANGELOG), so the fork carries
+ * its number beside it (title screen, lobby, server banner). The name is an i18n msgid (public/i18n/*.json).
  */
 export const FORK_VERSION = 'V0.0.1';
 export const FORK_LABEL = `${FORK_VERSION}（${APP_VERSION}）`;
@@ -18,6 +18,14 @@ export const FORK_NAME = N_('卫戍协议：狩猎模拟');
 /** A development build (the public `dev` branch): the title screen, the boot banner and the README say so, and
  * tools/package.mjs refuses to build a release zip from it without --allow-dev. */
 export const DEV_BUILD = /-dev$/.test(APP_VERSION);
+/**
+ * The plugin API levels this build supports (DESIGN §32, shared/plugins/manifest.js): a manifest 2 states the level it
+ * is written for (`api`); a level outside min…current keeps the plugin out. The level rises when the data shapes, the
+ * DSL vocabulary or the SDK a plugin relies on change incompatibly (CHANGELOG says how to migrate). Level 2 adds the
+ * declarative `offers` part (docs/PLUGINS.md): a manifest that uses it states `"api": 2`, and a build that knows only
+ * level 1 refuses that plugin instead of loading it without the part. [ASSUMED]
+ */
+export const PLUGIN_API = Object.freeze({ current: 2, min: 1 });
 
 export const MAX_SEATS = 4;
 /**
@@ -527,6 +535,34 @@ export const ERR = Object.freeze({
   CONFRONT_COUNT: 'CONFRONT_COUNT',   // 狩猎期: the placement holds more monsters than VERSUS_CONFRONT.maxPicks
   MERCHANT_CAP: 'MERCHANT_CAP',       // 商人: this round's withdrawal cap is reached
   MERCHANT_BANK: 'MERCHANT_BANK',     // 商人: not enough 赏金 in the bank for that withdrawal
+  // room.setPlugins (DESIGN §32): a plugin this server has not installed; one a room cannot switch on in this version
+  // (not a cosmetic or content plugin it loads, not of the room's scope, or not allowed by the server owner's
+  // plugins/config.json); a requirement missing or out of range, or a load-order cycle; two plugins in conflict; a set
+  // over the art size limit
+  PLUGIN_SCRIPT_CONFLICT: 'PLUGIN_SCRIPT_CONFLICT',
+  PLUGIN_SCRIPT_OVERRIDE: 'PLUGIN_SCRIPT_OVERRIDE',
+  PLUGIN_SCRIPT_CHECK: 'PLUGIN_SCRIPT_CHECK',
+  PLUGIN_SCRIPTS_DISABLED: 'PLUGIN_SCRIPTS_DISABLED',
+  PLUGIN_TRUST_PIN: 'PLUGIN_TRUST_PIN',
+  PLUGIN_TRUST_PUBLIC: 'PLUGIN_TRUST_PUBLIC',
+  PLUGIN_CONSENT: 'PLUGIN_CONSENT',
+  PLUGIN_UNKNOWN: 'PLUGIN_UNKNOWN',
+  PLUGIN_BLOCKED: 'PLUGIN_BLOCKED',
+  PLUGIN_DEPENDENCY: 'PLUGIN_DEPENDENCY',
+  PLUGIN_CONFLICT: 'PLUGIN_CONFLICT',
+  PLUGIN_RULE_CONFLICT: 'PLUGIN_RULE_CONFLICT',
+  PLUGIN_LIMIT: 'PLUGIN_LIMIT',
+  // P1c (DESIGN §32.6): a gameplay plugin made for other game versions or another plugin API (refused unless the server
+  // owner allows it: plugins/config.json allowIncompatible); the server already runs as many plugin content sets as its
+  // limit allows (plugins/config.json limits.maxSets); room.ready / room.start before every player's page has loaded and
+  // checked the room's content (room.contentReady)
+  PLUGIN_INCOMPATIBLE: 'PLUGIN_INCOMPATIBLE',
+  PLUGIN_BUSY: 'PLUGIN_BUSY',
+  CONTENT_NOT_READY: 'CONTENT_NOT_READY',
+  // match test mode (DESIGN §34.8 phase 2): the process switch is off, or this room was not created as a test room
+  TEST_CONFIRM: 'TEST_CONFIRM',
+  TEST_DISABLED: 'TEST_DISABLED',
+  TEST_FORBIDDEN: 'TEST_FORBIDDEN',
   INTERNAL: 'INTERNAL',
 });
 
@@ -540,6 +576,21 @@ export const ERR_TEXT = {
   SPECTATOR: N_('观战中无法进行该操作'), INTERNAL: N_('服务器内部错误'),
   CONFRONT_BUDGET: N_('投放的怪物总价值超出本回合预算'), CONFRONT_COUNT: N_('投放数量超出本回合上限'),
   MERCHANT_CAP: N_('本回合的取款已达上限'), MERCHANT_BANK: N_('赏金不足'),
+  PLUGIN_UNKNOWN: N_('本服务器没有安装该插件'), PLUGIN_BLOCKED: N_('该插件不能在房间中启用'), PLUGIN_DEPENDENCY: N_('缺少该插件需要的其他插件'),
+  PLUGIN_CONFLICT: N_('所选插件互相冲突'), PLUGIN_LIMIT: N_('所选插件的素材总量超出本服务器的上限'),
+  PLUGIN_RULE_CONFLICT: N_('两个插件把同一个规则开关设成了不同的选项'),
+  PLUGIN_INCOMPATIBLE: N_('该插件不适配本服务器的游戏版本'), PLUGIN_BUSY: N_('本服务器同时运行的插件组合已达上限，请稍后再试'),
+  PLUGIN_CONSENT: N_('还有玩家未同意运行受信任插件'),
+  PLUGIN_SCRIPTS_DISABLED: N_('服主没有启用脚本插件'),
+  PLUGIN_TRUST_PIN: N_('插件的锁文件或文件内容与服主钉住的哈希不符'),
+  PLUGIN_TRUST_PUBLIC: N_('公网监听默认禁止受信任插件'),
+  PLUGIN_SCRIPT_CONFLICT: N_('两个插件注册了同一个效果'),
+  PLUGIN_SCRIPT_OVERRIDE: N_('插件未声明要替换的官方技能'),
+  PLUGIN_SCRIPT_CHECK: N_('脚本未通过兼容性检查'),
+  CONTENT_NOT_READY: N_('仍有博士未载入房间的插件内容'),
+  TEST_CONFIRM: N_('这是测试房间，不计入任何记录。确认加入？'),
+  TEST_DISABLED: N_('测试模式未开启'),
+  TEST_FORBIDDEN: N_('这不是测试房间'),
 };
 
 // ---- Emotes (交流, research 09 §4) -----------------------------------------------------------------------------

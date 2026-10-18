@@ -1,5 +1,5 @@
 // Release metadata of this fork 《卫戍协议：狩猎模拟》: its own version ('0.0.1') in package.json / package-lock.json
-// beside the upstream release it is built on (shared/constants.js APP_VERSION, kept at 0.2.6) — the build label
+// beside the upstream release it is built on (shared/constants.js APP_VERSION, kept at 0.3.1) — the build label
 // (FORK_VERSION / FORK_LABEL) and the name the README, the title screen and the boot banner show — the
 // GPL-3.0-or-later licence (LICENSE, package.json, lockfile) and the notice files the README and the release bundle
 // point at.
@@ -21,7 +21,7 @@ const lock = JSON.parse(read('package-lock.json'));
 const PKG_NAME = 'hunt-simulation';
 const FORK_REPO = 'https://github.com/T1113047/Stronghold-Protocol-Hunt-Simulation';
 
-test('one release version: this fork\'s 0.0.1 everywhere, the upstream 0.2.6 beside it', () => {
+test('one release version: this fork\'s 0.0.1 everywhere, the upstream 0.3.1 beside it', () => {
   // the upstream baseline stays a release x.y.z, or x.y.z-dev on the public dev branch (the owner's decision of 2026-10-06)
   assert.match(APP_VERSION, /^\d+\.\d+\.\d+(-dev)?$/);
   assert.equal(DEV_BUILD, APP_VERSION.endsWith('-dev'));
@@ -41,7 +41,7 @@ test('CHANGELOG.md opens with this fork\'s entry, keeps the upstream releases be
   // the fork's own entry first: FORK_VERSION beside the upstream release it is built on; the upstream releases stay below
   const top = log.split('\n')[0];
   assert.match(top, /^## V0\.0\.1/, `the fork's entry opens the file: ${top}`);
-  assert.match(top, /0\.2\.6/, 'it names the upstream release it is built on');
+  assert.match(top, /0\.3\.1/, 'it names the upstream release it is built on');
   const first = log.match(/^## (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})/m);
   assert.ok(first, 'a "## x.y.z — date" heading');
   if (DEV_BUILD) {
@@ -78,8 +78,8 @@ test('this fork names itself: README title and badges, package name, repository 
   assert.match(readme, /sganggs\/Stronghold-Protocol/, 'the upstream project stays credited');
   // the README carries both badges: the upstream release this fork is built on, and the fork's own number
   // (shields.io shows the full-width parentheses of a badge label verbatim)
-  assert.match(readme, /badge\/version-0\.2\.6-/, 'the upstream release badge stays on the README');
-  assert.match(readme, /badge\/fork-V0\.0\.1（0\.2\.6）-/, 'the fork\'s own badge');
+  assert.match(readme, /badge\/version-0\.3\.1-/, 'the upstream release badge stays on the README');
+  assert.match(readme, /badge\/fork-V0\.0\.1（0\.3\.1）-/, 'the fork\'s own badge');
   assert.equal(pkg.name, PKG_NAME);
   assert.equal(lock.name, pkg.name);
   assert.equal(lock.packages[''].name, pkg.name);

@@ -9,6 +9,7 @@ import { buildResult } from '../results.js';
 import { FLOW_TICKER_PRIORITY, DELAYS } from './common.js';
 import { msg } from '../../../shared/i18n.js';
 import { onSettle, resetRoundCounters } from '../botEmotes.js';
+import { creditedKillsOf } from '../../sim/spec.js';
 
 export class MatchSettle {
   /**
@@ -73,7 +74,7 @@ export class MatchSettle {
       // only turned into funds by a withdrawal in prep (withdrawBounty). Carried across rounds with PlayerState.
       let bank = Math.max(0, Math.trunc(Number(r.bank) || 0));
       // 2V2: merge the per-player entries of every 联防 battle this player ran (coop: the single one)
-      const up = { coins: 0, bank: 0, damageDealt: 0, killed: 0 };
+      const up = { coins: 0, bank: 0, damageDealt: 0, killed: 0, creditedKills: 0 };
       let hasUp = false;
       for (const res of results) {
         const e = res && res.perPlayer && res.perPlayer[ps.playerId];
@@ -83,6 +84,7 @@ export class MatchSettle {
         up.bank += Math.max(0, Math.trunc(Number(e.bank) || 0));
         up.damageDealt += Number(e.damageDealt) || 0;
         up.killed += Number(e.killed) || 0;
+        up.creditedKills += creditedKillsOf(e);
       }
       if (hasUp) {
         coins += up.coins;
@@ -90,6 +92,8 @@ export class MatchSettle {
         ps.stats.dmgDealt += up.damageDealt;
         ps.stats.kills += up.killed;
       }
+      // upstream 0.3.1 (PR #509): statistics-only credited kills — this player's own battle plus its 联防 battle(s)
+      ps.creditedKills += creditedKillsOf(r) + up.creditedKills;
       // perfect-payout bounties (战术特训): own phase perfect
       for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) coins += b.card.coin;
       if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
@@ -113,16 +117,7 @@ export class MatchSettle {
       this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: uniteForPs });
       ps.recompute();
     }
-    for (const ps of alive) {
-      // 2V2: the whole team goes out together when its shared pool runs out (no per-teammate elimination)
-      const drained = this.teamLps ? this._teamLpOf(this.teamIdOf(ps)) <= 0 : ps.lp <= 0;
-      if (drained) {
-        if (!this.teamLps) ps.lp = 0;
-        ps.eliminate(this.round);
-        this.toast(ps, 'error', '你的目标生命值耗尽，已被淘汰');
-        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: ps.name }), FLOW_TICKER_PRIORITY, this.teamIdOf(ps));
-      }
-    }
+    this.eliminateBroken();
     this.fields = [];
     this.watchers.clear();
     this.markPublic();
@@ -153,6 +148,25 @@ export class MatchSettle {
     }
   }
 
+  /**
+   * Drop every alive player whose LP is already gone. Settlement calls this after the round's LP loss.
+   * An accepted test round jump calls the same helper before the next round starts, so LP 0 cannot be
+   * written back into a new prep. The LP command itself stays a raw write.
+   */
+  eliminateBroken() {
+    for (const ps of this.alivePlayers()) {
+      // 2V2: the whole team goes out together when its shared pool runs out (no per-teammate elimination)
+      const drained = this.teamLps ? this._teamLpOf(this.teamIdOf(ps)) <= 0 : ps.lp <= 0;
+      if (drained) {
+        if (!this.teamLps) ps.lp = 0;
+        ps.eliminate(this.round);
+        this.toast(ps, 'error', '你的目标生命值耗尽，已被淘汰');
+        // 2V2: the line names a player, so it stays inside that player's team (messaging.js tickerText)
+        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: ps.name }), FLOW_TICKER_PRIORITY, this.teamIdOf(ps));
+      }
+    }
+  }
+
   afterSettle() {
     if (!this.alivePlayers().length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
     // 2V2: a team fully eliminated before the Final Assault ends the match for BOTH teams (双败)
@@ -169,7 +183,10 @@ export class MatchSettle {
   }
 
   finish({ victory, hiddenCleared = false, reason = 'defeat' }) {
+    // A command that ends a test match must be audited/counted before publishing its result.
+    if (this.test && this._testApplying) { this._testOutcome = { victory, hiddenCleared, reason }; return; }
     if (this.ended || this.disposed) return;
+    this.offersDispose();
     this.ended = true;
     if (this.runner) { try { this.runner.stop(); } catch { /* ignore */ } this.runner = null; }
     this._stopClientCombat();
@@ -187,6 +204,11 @@ export class MatchSettle {
     } catch (e) {
       this.reportError('buildResult', e);
       result = { t: 'm.result', victory: !!victory, roundsPassed: 0, reason, modeId: this.modeId, difficulty: this.difficulty, players: [] };
+    }
+    if (this.test) {
+      result.test = true;
+      result.testActions = this.testActions;
+      if (this.testReplayable === false) result.testReplayable = false;
     }
     this.lastResultMsg = result;
     this.markPublic();
