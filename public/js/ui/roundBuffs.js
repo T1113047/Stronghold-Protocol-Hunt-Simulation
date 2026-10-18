@@ -19,10 +19,11 @@
 // The names, the effect lines and the receiver rule come from ui/eventOverlay.js (ALLY_NAMES / FOE_NAMES / allyEffect /
 // foeEffect / eventAllyCard / eventFoeCard / eventReceiver) — never a second copy of the 24 + 12 card tables. No new
 // msgids: the 强力属性 line is the overlay's own 「本回合 {share}% 的敌人带「{attr}」」.
-import { html } from './components.js';
+import { html, Icon } from './components.js';
 import { t } from '../../../shared/i18n.js';
 import { EVENT_DURATION_ROUNDS } from '../../../shared/constants.js';
-import { ALLY_NAMES, FOE_NAMES, allyEffect, foeEffect, eventAllyCard, eventFoeCard, eventReceiver } from './eventOverlay.js';
+import { ALLY_NAMES, FOE_NAMES, allyEffect, foeEffect, eventAllyCard, eventFoeCard, eventReceiver, detailOf } from './eventOverlay.js';
+import { openEntryDetail } from './entryDetail.js';
 
 export { eventReceiver };
 
@@ -55,7 +56,10 @@ export function roundBuffRows(pub, myId) {
     const mag = Number(rec.mag) || 1;
     const name = t(ALLY_NAMES[card.key] || card.key);
     const effect = allyEffect(card, mag);
-    rows.push({ kind: 'ally', key: card.key, name, effect, elite: '', title: effect ? `${name} ${effect}` : name });
+    rows.push({
+      kind: 'ally', key: card.key, name, effect, elite: '', title: effect ? `${name} ${effect}` : name,
+      detail: detailOf('ally', card, { mag, picked, round, target: 'self' }),
+    });
   }
   if (foe && Number(foe.round) === round) {
     const card = eventFoeCard(foe);
@@ -66,7 +70,10 @@ export function roundBuffRows(pub, myId) {
       const attr = e && e.attr ? (FOE_NAMES[e.attr] ? t(FOE_NAMES[e.attr]) : String(e.attr)) : '';
       // the server's share is a 0…1 fraction of the wave (event.js _drawFoeElite); the overlay rounds it the same way
       const elite = attr ? t('本回合 {share}% 的敌人带「{attr}」', { share: Math.round((Number(e.share) || 0) * 100), attr }) : '';
-      rows.push({ kind: 'foe', key: card.key, name, effect, elite, title: [name, effect, elite].filter(Boolean).join(' ') });
+      rows.push({
+        kind: 'foe', key: card.key, name, effect, elite, title: [name, effect, elite].filter(Boolean).join(' '),
+        detail: detailOf('foe', card, { elite: e }),
+      });
     }
   }
   return rows;
@@ -82,10 +89,14 @@ export function RoundBuffs({ pub, myId }) {
   return html`<div class="rbuffs" data-testid="round-buffs">
     <div class="rbuffs__title">${t('本回合词条')}</div>
     ${rows.length
-      ? rows.map((r, i) => html`<div key=${`${r.kind}:${i}`} class=${`rbuff rbuff--${r.kind}`}
-          data-testid=${`round-buff-${r.kind}`} title=${r.title}>
+      ? rows.map((r, i) => html`<button key=${`${r.kind}:${i}`} type="button"
+          class=${`rbuff rbuff--${r.kind} rbuff--${(r.detail && r.detail.tone) || 'mint'}`}
+          data-testid=${`round-buff-${r.kind}`} title=${`${r.title} · ${t('点击查看词条说明')}`}
+          onClick=${() => openEntryDetail(r.detail)}>
+          <span class="rbuff__icon"><${Icon} name=${(r.detail && r.detail.icon) || 'info'} /></span>
           <b class="rbuff__name">${r.name}</b>${r.effect ? html` <span class="rbuff__eff">${r.effect}</span>` : null}${r.elite ? html` <span class="rbuff__elite">${r.elite}</span>` : null}
-        </div>`)
+          <span class="rbuff__more"><${Icon} name="info" /></span>
+        </button>`)
       : html`<div class="rbuff rbuff--none" data-testid="round-buff-none">${t('暂无')}</div>`}
   </div>`;
 }

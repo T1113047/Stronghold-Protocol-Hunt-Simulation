@@ -103,6 +103,7 @@ import { EffectsList } from '../ui/effectsList.js';
 import { CombatHud, Overview } from '../ui/combatHud.js';
 import { CombatMetricsPanel } from '../ui/combatMetrics.js';
 import { SettingsModal, settingsStore, useSettings } from '../ui/settings.js';
+import { EntryDetailDialog, useEntryDetail, closeEntryDetail } from '../ui/entryDetail.js';
 import { ExitModal, AwayOverlay, awayStore } from '../ui/matchChrome.js';
 import { RoundPopup, PhasePopup, phasePopupOf, roundsToBoss, preloadPopupArt } from '../ui/matchPopups.js';
 import { openGuide } from '../ui/guide.js';
@@ -164,6 +165,7 @@ export function GameScreen() {
   const away = useStore((s) => s.away, Object.is, awayStore);
   const autoplay = useStore((s) => !!(Array.isArray(s.match.public?.players) && s.match.public.players.find((p) => p && p.playerId === s.me.playerId)?.autoplay));
   const gd = useGameData();
+  const entryDetail = useEntryDetail();
   // 协议启动！'s official sprites (ui/protocolBoot.js), fetched while the briefing and the band draft run
   useEffect(() => { if (gd.ready) preloadBootArt(); }, [gd.ready]);
   if (!pub || !gd.ready) {
@@ -181,6 +183,7 @@ export function GameScreen() {
   return html`${body}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
     ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} />` : null}
+    ${entryDetail ? html`<${EntryDetailDialog} detail=${entryDetail} onClose=${closeEntryDetail} />` : null}
     ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
 }
 

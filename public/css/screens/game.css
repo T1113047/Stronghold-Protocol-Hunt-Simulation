@@ -607,20 +607,37 @@
 
 /* ---- [EVBUFF] this round's 事件期 entries, under the team panel's last seat row (ui/roundBuffs.js) ------------------ */
 /* One small line per entry (the entries I received, then the monster entry + its 强力属性), deep panel background, a thin
-   line and an amber / red left mark — the same language as the teammate rows above. Text sizes read --t (a readable
-   size): 小 is the design's .10, the larger steps grow with it. Long lines truncate instead of wrapping. */
+   line and a coloured left mark matching the entry's kind — the same language as the teammate rows above. Every row is a
+   button: the icon names the class, the dotted underline says "open me", and the 说明 popup (ui/entryDetail.js) carries
+   the full effect and its maths. Text sizes read --t (a readable size); long lines truncate instead of wrapping. */
 .rbuffs { display: flex; flex-direction: column; gap: .02rem; align-self: flex-start; max-width: min(2.4rem, 72vw); }
 .rbuff {
-  display: block; max-width: 100%; padding: .02rem .06rem; background: rgba(8, 11, 10, .72);
-  border: 1px solid var(--line); border-left: 2px solid var(--amber);
-  font-size: calc(.10 * var(--t)); line-height: 1.45; color: var(--text-lo);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000;
+  display: block; width: 100%; max-width: 100%; margin: 0; padding: .02rem .06rem;
+  background: rgba(8, 11, 10, .72); border: 1px solid var(--line); border-left: 2px solid var(--amber);
+  font: inherit; font-size: calc(.10 * var(--t)); line-height: 1.45; color: var(--text-lo); text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; cursor: pointer;
 }
+.rbuff:hover { background: rgba(16, 24, 20, .9); border-color: var(--mint-700); }
 .rbuff--foe { border-left-color: var(--red-premium); }
-.rbuff__name { color: var(--amber); font-weight: 700; }
+.rbuff--mint { border-left-color: var(--mint-400); }
+.rbuff--gold { border-left-color: var(--gold); }
+.rbuff--red { border-left-color: var(--red-premium); }
+.rbuff__icon { display: inline-flex; width: .15rem; height: .15rem; margin-right: .03rem; vertical-align: -.03rem; color: var(--text-md); }
+.rbuff__icon .icon { width: 100%; height: 100%; }
+.rbuff--mint .rbuff__icon { color: var(--mint-400); }
+.rbuff--gold .rbuff__icon { color: var(--gold); }
+.rbuff--red .rbuff__icon { color: var(--red-premium); }
+.rbuff__name { color: var(--amber); font-weight: 700; text-decoration: underline dotted; text-underline-offset: .02rem; }
+.rbuff--mint .rbuff__name { color: var(--mint-400); }
+.rbuff--gold .rbuff__name { color: var(--gold); }
+.rbuff--red .rbuff__name { color: var(--red-premium); }
 .rbuff--foe .rbuff__name { color: var(--orange-hi); }
 .rbuff__eff { margin-left: .02rem; color: var(--text-md); }
 .rbuff__elite { margin-left: .02rem; color: var(--text-dim); }
+.rbuff__more { display: inline-flex; width: .12rem; height: .12rem; margin-left: .04rem; vertical-align: -.02rem; opacity: .55; }
+.rbuff__more .icon { width: 100%; height: 100%; }
+.rbuff:hover .rbuff__more { opacity: 1; }
+.rbuff--none { cursor: default; }
 
 /* ---- [CHAT] in-match text chat (independent bar in the corner stack, above the 交流 row) ----------------------- */
 .gchat { position: relative; display: flex; align-items: center; gap: .06rem; width: max(3.6rem, 240px); max-width: 72vw; }

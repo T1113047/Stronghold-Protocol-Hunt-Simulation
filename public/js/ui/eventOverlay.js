@@ -8,6 +8,7 @@
 import { html, Icon, MicroLabel, Countdown } from '../ui/components.js';
 import { useStore } from '../store.js';
 import { RosterPanel } from './rosterPanel.js';
+import { openEntryDetail, entryLook } from './entryDetail.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import {
   EVENT_CARDS, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_PICK_SECONDS,
@@ -176,6 +177,40 @@ export function eliteEffect(key) {
 }
 
 /**
+ * The payload of the 词条说明 popup (ui/entryDetail.js) for one entry. Names and effects go through the same tables as
+ * the overlay and the P4 strip; `mag` is the receiver's magnitude (2 for 自己), `picked` / `round` drive the rounds-left
+ * line, and `elite` is `m.public.event.foe.elite` for a monster entry. Never throws on an unknown key.
+ * @param {'ally'|'foe'} kind
+ * @param {any} card an EVENT_CARDS / EVENT_FOE_CARDS row
+ * @param {{ mag?: number, round?: number|null, picked?: number|null, target?: string, elite?: any }} [opts]
+ */
+export function detailOf(kind, card, { mag = 1, round = null, picked = null, target = 'self', elite = null } = {}) {
+  if (!card) return null;
+  const ally = kind === 'ally';
+  const look = entryLook(kind, card);
+  return {
+    kind,
+    key: card.key,
+    name: t((ally ? ALLY_NAMES : FOE_NAMES)[card.key] || card.key),
+    ...look,
+    base: ally ? allyEffect(card, 1) : foeEffect(card),
+    now: ally ? allyEffect(card, mag) : foeEffect(card),
+    mag,
+    targetLabel: ally
+      ? (TARGET_LABEL[target] ? t(TARGET_LABEL[target]) : t(target))
+      : t('本回合的敌人'),
+    picked: picked != null && Number.isFinite(Number(picked)) ? Number(picked) : null,
+    round: round != null && Number.isFinite(Number(round)) ? Number(round) : null,
+    elite: elite && elite.attr ? {
+      name: t(FOE_NAMES[elite.attr] || elite.attr),
+      share: Math.round((Number(elite.share) || 0) * 100),
+      count: Number(elite.count) || 0,
+      effect: eliteEffect(elite.attr),
+    } : null,
+  };
+}
+
+/**
  * The 事件期 panel: the round's monster entry and 强力属性 on top (visible before picking), then the four targets and
  * the match's three selections under them.
  * @param {{ pub:any, busy?:boolean, onPick:(target:string)=>void }} props
@@ -214,6 +249,7 @@ export function EventOverlay({ pub, busy = false, onPick }) {
   const elite = foe && foe.elite ? foe.elite : null;
   const eliteName = elite ? (FOE_NAMES[elite.attr] || elite.attr || '') : '';
   const eliteShare = elite ? Math.round((Number(elite.share) || 0) * 100) : 0;
+  const foeDetail = foeCard ? detailOf('foe', foeCard, { elite }) : null;
 
   // the picked entry (the result line) and the three rows of the match's selections
   const pickedCard = myPick ? (ALLY_BY_KEY.get(myPick.key) || ALLY_BY_ID.get(myPick.card) || null) : null;
@@ -230,7 +266,10 @@ export function EventOverlay({ pub, busy = false, onPick }) {
     const n = i + 1;
     const rec = history.find((r) => r.index === n) || (myPick && index === n ? myPick : null);
     const card = rec ? (ALLY_BY_KEY.get(rec.key) || ALLY_BY_ID.get(rec.card) || null) : null;
-    return { n, round, rec, card };
+    const detail = card && rec ? detailOf('ally', card, {
+      mag: Number(rec.mag) || 1, picked: rec.round, round: pub.round, target: rec.target,
+    }) : null;
+    return { n, round, rec, card, detail };
   });
 
   /** Why a target cannot be picked (null: it can), and its selected state. */
@@ -281,10 +320,12 @@ export function EventOverlay({ pub, busy = false, onPick }) {
 
       ${foeCard ? html`<section class="evov__foe" data-testid="event-foe">
         <h3 class="evov__h">${t('本回合的怪物词条')}</h3>
-        <div class="evov__foecard">
+        <button type="button" class="evov__foecard evov__link" data-testid="event-foe-detail" title=${t('点击查看词条说明')}
+          onClick=${() => openEntryDetail(foeDetail)}>
           <b class="evov__name">${t(FOE_NAMES[foeCard.key] || foeCard.key)}</b>
           <span class="evov__eff">${foeEffect(foeCard)}</span>
-        </div>
+          <span class="evov__more"><${Icon} name="info" /></span>
+        </button>
         ${elite ? html`<p class="evov__elite" data-testid="event-elite">
           <b>${t('强力属性')}</b>
           <span>${eliteName ? t('本回合 {share}% 的敌人带「{attr}」', { share: eliteShare, attr: t(eliteName) }) : t('强力属性')}</span>
@@ -317,6 +358,10 @@ export function EventOverlay({ pub, busy = false, onPick }) {
             ? t('已选择 → 你收到了「{card}」', { card: pickedName })
             : t('已选择 → 送给{target}「{card}」', { target: pickedTargetLabel, card: pickedName })}</span>
           <span class="evov__eff">${grantPrefix && pickedEffect ? `${grantPrefix}${pickedEffect}` : pickedEffect}</span>
+          ${pickedCard ? html`<button type="button" class="evov__look" title=${t('点击查看词条说明')}
+            onClick=${() => openEntryDetail(detailOf('ally', pickedCard, {
+              mag: pickedMag, picked: myPick.round, round: pub.round, target: pickedTarget || 'self',
+            }))}><${Icon} name="info" />${t('词条说明')}</button>` : null}
           ${myPick.auto ? html`<span class="evov__auto">${t('自动选择')}</span>` : null}
         </p>` : null}
 
@@ -328,7 +373,10 @@ export function EventOverlay({ pub, busy = false, onPick }) {
             <span class="evohist__n">${t('第 {n} 次', { n: r.n })}</span>
             <span class="evohist__round num">${r.round ? `R${r.round}` : '—'}</span>
             <span class="evohist__target">${r.rec && TARGET_LABEL[r.rec.target] ? t(TARGET_LABEL[r.rec.target]) : t('尚未选择')}</span>
-            <span class="evohist__card">${r.card ? `「${t(ALLY_NAMES[r.card.key])}」` : '—'}</span>
+            ${r.card && r.detail
+              ? html`<button type="button" class="evohist__card evohist__link" title=${t('点击查看词条说明')}
+                  onClick=${() => openEntryDetail(r.detail)}>「${t(ALLY_NAMES[r.card.key])}」<${Icon} name="info" /></button>`
+              : html`<span class="evohist__card">—</span>`}
             ${r.rec && r.rec.auto ? html`<span class="evov__auto">${t('自动选择')}</span>` : null}
           </li>`)}
         </ol>

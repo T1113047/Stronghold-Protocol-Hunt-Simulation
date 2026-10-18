@@ -136,3 +136,41 @@ test('the component reuses the 事件期 overlay: no second card table, no new m
   assert.match(css, /\.rbuff \{[^}]*font-size: calc\(\.10 \* var\(--t\)\)[^}]*white-space: nowrap; overflow: hidden; text-overflow: ellipsis/s);
   assert.match(css, /\.rbuffs \{[^}]*max-width: min\(2\.4rem, 72vw\)/);
 });
+
+test('each strip row carries the 词条说明 popup payload: class icon, kind tone, base vs doubled effect, rounds left', () => {
+  const pub = pubWith([
+    { round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 4, key: 'blunted', kind: 'down', mag: 2 },
+    { round: 6, index: 1, playerId: 'b', target: 'mate', targetId: 'a', card: 2, key: 'tailwind', kind: 'up', mag: 1 },
+  ]);
+  const rows = roundBuffRows(pub, 'a');
+  const ally = rows.find((r) => r.name === '钝口');
+  assert.ok(ally.detail, 'an ally row has the popup payload');
+  assert.equal(ally.detail.icon, 'sword', 'output entries use the sword icon');
+  assert.equal(ally.detail.tone, 'red', 'a down entry is red');
+  assert.equal(ally.detail.classLabel, '输出');
+  assert.equal(ally.detail.base, '攻击力 -9%', 'the base effect at ×1');
+  assert.equal(ally.detail.now, '攻击力 -18%', 'self doubles it');
+  assert.equal(ally.detail.mag, 2);
+  assert.equal(ally.detail.picked, 8);
+  assert.equal(ally.detail.round, 8);
+  assert.equal(ally.detail.targetLabel, '自己');
+  const tail = rows.find((r) => r.name === '追风');
+  assert.equal(tail.detail.picked, 6);
+  assert.equal(tail.detail.mag, 1, 'a mate\'s entry stays at ×1');
+  const foe = rows.find((r) => r.kind === 'foe');
+  assert.equal(foe.detail.icon, 'sword');
+  assert.equal(foe.detail.tone, 'red', 'an unfavourable monster entry is red');
+  assert.equal(foe.detail.elite.name, '疾行');
+  assert.equal(foe.detail.elite.share, 10);
+  assert.equal(foe.detail.elite.count, 2);
+  assert.equal(foe.detail.elite.effect, '敌人移动速度 ×1.2');
+  // the popup is mounted once at the game root, above the event overlay's stacking context, not inside the HUD strip
+  const game = read('public/js/screens/game.js');
+  const detail = read('public/js/ui/entryDetail.js');
+  assert.match(game, /useEntryDetail\(\)/);
+  assert.match(game, /<\$\{EntryDetailDialog\} detail=\$\{entryDetail\} onClose=\$\{closeEntryDetail\} \/>/);
+  assert.match(detail, /export function openEntryDetail/);
+  assert.match(detail, /EVENT_DURATION_ROUNDS/);
+  assert.match(detail, /选择「自己」时所有数值 ×2/);
+  assert.match(detail, /多个词条按环境乘区相乘/);
+});

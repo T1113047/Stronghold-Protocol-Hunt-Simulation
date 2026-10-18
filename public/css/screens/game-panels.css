@@ -868,6 +868,17 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   border-left: 2px solid var(--orange); background: rgba(232, 90, 26, .07); }
 .evov__h { font-size: calc(.17 * var(--t)); margin: 0 0 .05rem; flex: 0 0 auto; }
 .evov__foecard { display: flex; align-items: baseline; gap: .14rem; flex-wrap: wrap; }
+/* an entry is a button: the dotted underline + ⓘ say "open the explanation" (ui/entryDetail.js) */
+.evov__link { width: 100%; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.evov__link .evov__name { text-decoration: underline dotted; text-underline-offset: .04rem; }
+.evov__link:hover .evov__name { color: #fff; }
+.evov__more { display: inline-flex; width: .18rem; height: .18rem; margin-left: auto; color: var(--text-md); opacity: .7; }
+.evov__more .icon { width: 100%; height: 100%; }
+.evov__link:hover .evov__more { color: var(--mint-400); opacity: 1; }
+.evov__look { display: inline-flex; align-items: center; gap: .03rem; padding: 0 .06rem; background: transparent;
+  border: 1px solid var(--line-2); color: var(--text-md); font: inherit; font-size: calc(.11 * var(--t)); cursor: pointer; }
+.evov__look .icon { width: .14rem; height: .14rem; }
+.evov__look:hover { color: var(--mint-400); border-color: var(--mint-700); }
 .evov__foe .evov__h { margin: 0; color: var(--text-lo); font-size: calc(.13 * var(--t)); letter-spacing: .08em; }
 .evov__name { font-size: calc(.26 * var(--t)); font-weight: 900; color: var(--orange-hi); letter-spacing: .04em; }
 .evov__eff { font-size: calc(.14 * var(--t)); color: var(--text-md); }
@@ -909,6 +920,11 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .evohist__round { min-width: .42rem; color: var(--text-lo); }
 .evohist__target { min-width: 1.1rem; color: var(--text-hi); }
 .evohist__card { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evohist__link { display: inline-flex; align-items: center; gap: .03rem; padding: 0; border: 0; background: none;
+  color: var(--text-hi); font: inherit; text-align: left; text-decoration: underline dotted; text-underline-offset: .02rem; cursor: pointer; }
+.evohist__link .icon { width: .14rem; height: .14rem; flex: none; opacity: .6; }
+.evohist__link:hover { color: var(--mint-400); }
+.evohist__link:hover .icon { opacity: 1; }
 @media (max-height: 431.98px) {
   /* landscape phone: the monster block stays compact and the body does the scrolling */
   .evov .spov__inner { gap: .06rem; }
@@ -918,6 +934,30 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   .evotarget { padding: .05rem .08rem; }
   .evov__hint { margin: .04rem 0 .06rem; }
   .evohist__row { padding: .02rem .08rem; }
+}
+
+/* ---- 词条说明 popup (ui/entryDetail.js): the effect, how the number is computed, and how long it lasts ------------- */
+.entrydlg .modal__body { display: flex; flex-direction: column; gap: .07rem; }
+.entrydlg__meta { display: flex; align-items: center; gap: .08rem; flex-wrap: wrap; font-size: calc(.14 * var(--t)); }
+.entrydlg__badge { display: inline-flex; align-items: center; gap: .04rem; padding: .01rem .08rem;
+  border: 1px solid currentColor; border-radius: .06rem; font-weight: 800; letter-spacing: .04em; }
+.entrydlg__badge .icon { width: .16rem; height: .16rem; }
+.entrydlg__badge.is-mint { color: var(--mint-400); }
+.entrydlg__badge.is-gold { color: var(--gold-2); }
+.entrydlg__badge.is-red { color: var(--red-premium); }
+.entrydlg__class { color: var(--text-md); }
+.entrydlg__left { margin-left: auto; color: var(--text-lo); font-size: calc(.12 * var(--t)); }
+.entrydlg__row { display: flex; align-items: baseline; gap: .1rem; margin: 0; font-size: calc(.16 * var(--t)); line-height: 1.5; }
+.entrydlg__k { flex: 0 0 1.05rem; color: var(--text-lo); }
+.entrydlg__v { color: var(--text-hi); }
+.entrydlg__mul { margin-left: .08rem; font-size: calc(.12 * var(--t)); color: var(--gold-2); }
+.entrydlg__elite { display: flex; flex-direction: column; gap: .03rem; padding-top: .05rem; border-top: 1px dashed var(--line-2); }
+.entrydlg__notes { display: flex; flex-direction: column; gap: .04rem; margin-top: .02rem; padding-top: .07rem;
+  border-top: 1px dashed var(--line-2); font-size: calc(.13 * var(--t)); line-height: 1.55; color: var(--text-md); }
+.entrydlg__notes p { margin: 0; }
+@media (max-height: 431.98px) {
+  .entrydlg .modal__body { gap: .04rem; }
+  .entrydlg__row { font-size: calc(.14 * var(--t)); }
 }
 
 /* ---- [ROSTER] 公示 (ui/rosterPanel.js): 悬赏名单 / 同盟狩猎 投放公示 / 事件期 词条公示, one shared shape ------- */
