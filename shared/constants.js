@@ -352,8 +352,8 @@ export const EVENT_CARDS = Object.freeze([
   Object.freeze({ id: 20, key: 'hunter_commission', class: 'economy', kind: 'up', goldPerRound: 3, ev: 15 }), // 猎人佣金
   Object.freeze({ id: 21, key: 'bounty_scent', class: 'economy', kind: 'up', bountyGold: 3, ev: 9 }),    // 赏金嗅觉
   Object.freeze({ id: 22, key: 'nimble', class: 'economy', kind: 'up', deploy: 1, ev: 9 }),              // 轻捷
-  Object.freeze({ id: 23, key: 'empty_handed', class: 'economy', kind: 'down', goldPerRound: -3, duration: 1, ev: -13.5 }), // 空手而归（经济负面：只压 1 回合）
-  Object.freeze({ id: 24, key: 'market_swap', class: 'economy', kind: 'mid', refreshDiscount: 1, refreshUses: 2, sellDiscount: 1, ev: 1 }), // 集市换货
+  Object.freeze({ id: 23, key: 'empty_handed', class: 'economy', kind: 'down', goldPerRound: -2, duration: 1, ev: -9 }), // 空手而归（经济负面：−2，只压 1 回合）
+  Object.freeze({ id: 24, key: 'market_swap', class: 'economy', kind: 'mid', refreshDiscount: 1, refreshUses: 2, sellDiscount: 1, duration: 1, ev: 1 }), // 集市换货（卖干员 −1：只持续 1 回合）
 ]);
 
 /**

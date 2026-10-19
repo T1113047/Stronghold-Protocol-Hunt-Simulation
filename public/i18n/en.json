@@ -2474,5 +2474,6 @@
   "本队已选 {n}/{total}": "Your team has picked {n}/{total}",
   "本期事件词条": "This period's event entries",
   "最后一回合：还有赏金未取出，点击坎诺特兑换": "Last round: bounty is still banked — open Cantor to withdraw it",
-  "最后回合 · 取出赏金": "Last round · withdraw"
+  "最后回合 · 取出赏金": "Last round · withdraw",
+  "剩 {n} 回合": "{n} rounds left"
 }

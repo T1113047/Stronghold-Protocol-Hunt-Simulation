@@ -60,6 +60,7 @@ export function roundBuffRows(pub, myId) {
     const effect = allyEffect(card, mag);
     rows.push({
       kind: 'ally', key: card.key, name, effect, elite: '', title: effect ? `${name} ${effect}` : name,
+      left: Math.max(1, picked + duration - round),
       detail: detailOf('ally', card, { mag, picked, round, target: 'self', duration }),
     });
   }
@@ -73,7 +74,7 @@ export function roundBuffRows(pub, myId) {
       // the server's share is a 0…1 fraction of the wave (event.js _drawFoeElite); the overlay rounds it the same way
       const elite = attr ? t('本回合 {share}% 的敌人带「{attr}」', { share: Math.round((Number(e.share) || 0) * 100), attr }) : '';
       rows.push({
-        kind: 'foe', key: card.key, name, effect, elite, title: [name, effect, elite].filter(Boolean).join(' '),
+        kind: 'foe', key: card.key, name, effect, elite, title: [name, effect, elite].filter(Boolean).join(' '), left: 1,
         detail: detailOf('foe', card, { elite: e }),
       });
     }
@@ -97,6 +98,7 @@ export function RoundBuffs({ pub, myId }) {
           onClick=${() => openEntryDetail(r.detail)}>
           <span class="rbuff__icon"><${Icon} name=${(r.detail && r.detail.icon) || 'info'} /></span>
           <b class="rbuff__name">${r.name}</b>${r.effect ? html` <span class="rbuff__eff">${r.effect}</span>` : null}${r.elite ? html` <span class="rbuff__elite">${r.elite}</span>` : null}
+          ${r.left ? html`<span class="rbuff__left">${t('剩 {n} 回合', { n: r.left })}</span>` : null}
           <span class="rbuff__more"><${Icon} name="info" /></span>
         </button>`)
       : html`<div class="rbuff rbuff--none" data-testid="round-buff-none">${t('暂无')}</div>`}

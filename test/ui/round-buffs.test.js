@@ -65,6 +65,8 @@ test('the strip lists the entries I RECEIVED this round — from my own pick and
   assert.equal(rows[3].effect, '敌人攻击力 ×1.15', 'the monster entry, in the overlay\'s wording');
   assert.equal(rows[3].elite, '本回合 10% 的敌人带「疾行」', '强力属性 merged into the monster line');
   assert.equal(rows[0].title, '磨刃 攻击力 +20%', 'the full line stays in the title when CSS truncates the text');
+  assert.equal(rows[0].left, 4, 'four rounds left on the pick round');
+  assert.equal(rows[3].left, 1, 'the monster entry is this round only');
 });
 
 test('the receiver is ally.targets[picker][target]; a missing map falls back to the record\'s targetId; no target means no row', () => {
@@ -117,7 +119,7 @@ test('经济类负面词条（空手而归）在 P4 词条条只显示 1 回合�
   const r8 = roundBuffRows(pub, 'a');
   assert.equal(r8.length, 1);
   assert.equal(r8[0].detail.duration, 1);
-  assert.equal(r8[0].effect, '每回合金币 -6', 'self doubles the -3');
+  assert.equal(r8[0].effect, '每回合金币 -4', 'self doubles the -2');
   pub.round = 9;
   pub.event.ally.round = 9;
   assert.deepEqual(roundBuffRows(pub, 'a'), [], 'the economy debuff is gone after its own round');
@@ -146,7 +148,8 @@ test('the component reuses the 事件期 overlay: no second card table, no new m
   // one line, small, truncated; a thin border and the amber / red mark, no layout of its own
   assert.match(css, /\/\* ---- \[EVBUFF\]/);
   assert.match(css, /\.rbuff \{[^}]*font-size: calc\(\.10 \* var\(--t\)\)[^}]*white-space: nowrap; overflow: hidden; text-overflow: ellipsis/s);
-  assert.match(css, /\.rbuffs \{[^}]*max-width: min\(4\.4rem, 92vw\)/);
+  assert.match(css, /\.rbuffs \{[^}]*max-width: min\(4\.4rem, 92vw\)[^}]*pointer-events: auto/);
+  assert.match(css, /\.rbuff__left \{/);
 });
 
 test('each strip row carries the 词条说明 popup payload: class icon, kind tone, base vs doubled effect, rounds left', () => {

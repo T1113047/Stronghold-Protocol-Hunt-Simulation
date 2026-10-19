@@ -369,7 +369,7 @@ describe('2V2 事件期: every entry actually applies', () => {
     assert.equal(ps.deployCap, base + 1);
   });
 
-  test('猎人佣金 / 空手而归: ±3 gold each round (and ×2 on self)', () => {
+  test('猎人佣金 / 空手而归: +3 / −2 gold each round (and ×2 on self)', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 4, fake: true }).start();
     const ps = h.ps('p_0');
     ps.eventEntries = [{ card: C('hunter_commission'), mag: 1 }];
@@ -382,7 +382,7 @@ describe('2V2 事件期: every entry actually applies', () => {
     ps.eventMods = eventModsFor(ps.eventEntries);
     ps.funds = 0;
     ps.startRound(6);
-    assert.equal(ps.funds, Math.max(0, ps.gd.income(6) - 3));
+    assert.equal(ps.funds, Math.max(0, ps.gd.income(6) - 2));
 
     ps.eventEntries = [{ card: C('hunter_commission'), mag: 2 }];
     ps.eventMods = eventModsFor(ps.eventEntries);
@@ -626,7 +626,8 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     const entry = { card, duration: 1, mag: 1, round: 8 };
     assert.equal(eventEntryActive(entry, 8), true);
     assert.equal(eventEntryActive(entry, 9), false);
-    assert.equal(eventModsFor([entry], 8).goldPerRound, -3);
+    assert.equal(eventModsFor([entry], 8).goldPerRound, -2);
+    assert.equal(eventModsFor([{ ...entry, mag: 2 }], 8).goldPerRound, -4, 'self doubles the −2');
     assert.equal(eventModsFor([entry], 9).goldPerRound, 0);
     // a normal entry still lasts the full 4 rounds
     assert.equal(eventCardDuration(C('whetstone')), EVENT_DURATION_ROUNDS);
@@ -666,13 +667,14 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     ];
     const chessId = 'chess_char_1_01_a';
     const baseSell = ps.gd.sellPrice(chessId);
+    // 集市换货 now lasts one round; 猎人佣金 still four
     for (const r of [picked, picked + 1, picked + 2, picked + 3]) {
       ps.funds = 0;
       ps.startRound(r);
       assert.equal(ps.eventMods.goldPerRound, 3, `R${r} income entry`);
       assert.equal(ps.funds, ps.gd.income(r) + 3, `R${r} income +3`);
-      assert.equal(ps.eventRefreshDiscount(), 1, `R${r} refresh −1`);
-      assert.equal(ps.eventSellGain(baseSell), baseSell - 1, `R${r} sell −1`);
+      assert.equal(ps.eventRefreshDiscount(), r === picked ? 1 : 0, `R${r} refresh discount only on the pick round`);
+      assert.equal(ps.eventSellGain(baseSell), r === picked ? baseSell - 1 : baseSell, `R${r} sell −1 only on the pick round`);
     }
     ps.funds = 0;
     ps.startRound(picked + 4);
