@@ -280,6 +280,18 @@ describe('versus (2V2) match: team model', () => {
     assert.equal(typeof validateC2S({ t: 'g.choice', idx: -1 }), 'string');
   });
 
+  test('versus: 最终狩猎 (R13) keeps all 7 type cards, with no UP draw', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 84, fake: true }).start();
+    const m = h.m;
+    m.round = 13;
+    const groups = m.confrontGroups();
+    assert.equal(m.confrontHunt(), true);
+    assert.equal(groups.length, Object.keys(DATA.factions.types).length, 'all official types in the final hunt');
+    assert.equal(groups.filter((g) => g.up).length, 0, 'no UP cards in the final hunt');
+    assert.ok(groups.every((g) => g.rows.length > 0));
+    m.dispose();
+  });
+
   test('versus: the 机变 generator keeps one family and a fixed gradient (bounty I×2/II×1/III×1, shop 3 unchanged)', () => {    const m = makeMatch({ mode: 'versus', difficulty: 'HARD', seats: vsSeats(), seed: 71, fake: true }).start().m;
     const opts = {
       stageId: m.stageId,

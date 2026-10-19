@@ -312,9 +312,14 @@ export class MatchConfront {
       key: k, name: (en[k] && en[k].name) || k, value: this.confrontValueOf(k, scale),
     }));
     const byId = new Map(all.map((g) => [g.id, g]));
-    const draw = this.confrontTypeDraw(all, this.confrontBudget());
-    this._confrontGroups = draw.ids.map((id) => byId.get(id)).filter(Boolean)
-      .map((g) => ({ ...g, up: draw.up.has(g.id) }));
+    // 最终狩猎 (R13) keeps the original 7-type panel; the 4-card draw (2 UP + 2 normal) is for the earlier hunt rounds.
+    if (this.confrontHunt()) {
+      this._confrontGroups = all.map((g) => ({ ...g, up: false }));
+    } else {
+      const draw = this.confrontTypeDraw(all, this.confrontBudget());
+      this._confrontGroups = draw.ids.map((id) => byId.get(id)).filter(Boolean)
+        .map((g) => ({ ...g, up: draw.up.has(g.id) }));
+    }
     this._confrontSig = sig;
     return this._confrontGroups;
   }
