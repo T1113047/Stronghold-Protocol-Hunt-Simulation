@@ -426,6 +426,8 @@ export class Match {
     this.rngMeta = rng('meta');
     // 2V2 对抗期: the random drop of the opponent's originals (its own stream, so no other draw shifts)
     this.rngConfront = rng('confront');
+    // 狩猎期 type cards: draw 4 of the 7 特训敌人 types per round (2 UP + 2 normal)
+    this.rngConfrontTypes = rng('confront-types');
     // 同盟狩猎: the system's prey picks (one stream of its own; a co-op match is the only consumer)
     this.rngCoopHunt = rng('coop-hunt');
     // 2V2 事件期: the type / entry draws (its own stream too — golden scenarios never enter the event phase)

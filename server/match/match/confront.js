@@ -255,18 +255,66 @@ export class MatchConfront {
   }
 
   /**
-   * The groups offered in the 狩猎期: the official 特训敌人 types, each carrying its pool members priced in this round's
-   * currency (confrontValueOf). Recomputed when the round changes (the scaling moves values between rounds).
-   * @returns {Array<{ id: string, name: string, icon: string|null, desc: string, rows: Array<{ key: string, name: string, value: number }> }>}
+   * The four 特训敌人 types shown this round (same for both teams): two UP types + two normal, all distinct. The draw is
+   * seeded per round (rngConfrontTypes) and cached, so opening the panel / a reconnect shows the same four cards.
+   * `all` / `budget` let the draw guarantee that at least one offered type has a monster the round's budget can afford;
+   * an empty/unplayable board would otherwise be possible from a four-type subset.
+   * @param {Array<{ id: string, rows: Array<{ value: number }> }>} [all]
+   * @param {number} [budget]
+   * @returns {{ round: number, ids: string[], up: Set<string> }}
+   */
+  confrontTypeDraw(all = [], budget = null) {
+    const round = this.round;
+    if (this._confrontTypeDraw && this._confrontTypeDraw.round === round) return this._confrontTypeDraw;
+    const ids = all.length ? all.map((g) => g.id) : Object.keys((this.data && this.data.factions && this.data.factions.types) || {});
+    const pool = ids.slice();
+    const up = [];
+    for (let i = 0; i < 2 && pool.length; i++) {
+      const k = Math.floor(this.rngConfrontTypes() * pool.length);
+      up.push(pool.splice(Math.max(0, Math.min(pool.length - 1, k)), 1)[0]);
+    }
+    const normal = [];
+    for (let i = 0; i < 2 && pool.length; i++) {
+      const k = Math.floor(this.rngConfrontTypes() * pool.length);
+      normal.push(pool.splice(Math.max(0, Math.min(pool.length - 1, k)), 1)[0]);
+    }
+    let picked = [...up, ...normal];
+    // a four-type draw must still let every seat place at least one monster within this round's value budget
+    const b = Number(budget);
+    const selected = new Set(picked);
+    if (Number.isFinite(b) && b > 0 && !all.some((g) => selected.has(g.id) && (g.rows || []).some((r) => Number(r.value) <= b))) {
+      const alt = all.filter((g) => !selected.has(g.id) && (g.rows || []).some((r) => Number(r.value) <= b))
+        .sort((x, y) => Math.min(...x.rows.map((r) => Number(r.value) || Infinity)) - Math.min(...y.rows.map((r) => Number(r.value) || Infinity)))[0];
+      if (alt) {
+        const slot = picked.findIndex((id) => !up.includes(id));
+        if (slot >= 0) picked[slot] = alt.id;
+      }
+    }
+    for (let i = picked.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rngConfrontTypes() * (i + 1));
+      [picked[i], picked[j]] = [picked[j], picked[i]];
+    }
+    this._confrontTypeDraw = { round, ids: picked, up: new Set(up) };
+    return this._confrontTypeDraw;
+  }
+
+  /**
+   * The groups offered in the 狩猎期: four of the official 特训敌人 types (two UP + two normal, drawn once per round),
+   * each carrying its pool members priced in this round's currency (confrontValueOf). Recomputed when the round changes.
+   * @returns {Array<{ id: string, name: string, icon: string|null, desc: string, up: boolean, rows: Array<{ key: string, name: string, value: number }> }>}
    */
   confrontGroups() {
     const scale = this.confrontScale();
     const sig = `${this.round}|${scale.hpMul}|${scale.atkMul}`;
     if (this._confrontGroups && this._confrontSig === sig) return this._confrontGroups;
     const en = (this.data && this.data.enemies) || {};
-    this._confrontGroups = confrontTypeGroups(this.data && this.data.factions, (k) => ({
+    const all = confrontTypeGroups(this.data && this.data.factions, (k) => ({
       key: k, name: (en[k] && en[k].name) || k, value: this.confrontValueOf(k, scale),
     }));
+    const byId = new Map(all.map((g) => [g.id, g]));
+    const draw = this.confrontTypeDraw(all, this.confrontBudget());
+    this._confrontGroups = draw.ids.map((id) => byId.get(id)).filter(Boolean)
+      .map((g) => ({ ...g, up: draw.up.has(g.id) }));
     this._confrontSig = sig;
     return this._confrontGroups;
   }

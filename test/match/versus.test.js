@@ -942,15 +942,18 @@ describe('versus (2V2) match: team model', () => {
     assert.equal(m.round, m.contestStartRound, 'at the contest round');
     assert.equal(m.confrontStage, 'target', 'step 1 (who do I attack) comes first');
     const groups = m.confrontGroups();
-    // the groups are the OFFICIAL 特训敌人 types (data/factions.json), in the data's order — NOT equal-value buckets
+    // four of the OFFICIAL 特训敌人 types per round: two UP + two normal, all distinct (user 2026-10-19)
     const typeIds = Object.keys(DATA.factions.types);
-    assert.deepEqual(groups.map((g) => g.id), typeIds, 'one group per 特训敌人 type');
-    assert.equal(groups.length, typeIds.length, `${typeIds.length} type groups`);
+    assert.equal(groups.length, 4, 'four type cards');
+    assert.equal(new Set(groups.map((g) => g.id)).size, 4, 'the four types are distinct');
+    assert.ok(groups.every((g) => typeIds.includes(g.id)), 'every card is an official 特训敌人 type');
+    assert.equal(groups.filter((g) => g.up).length, 2, 'two UP cards');
     assert.ok(groups.every((g) => g.rows.length > 0), 'no empty type');
     assert.ok(groups.every((g) => g.name && g.icon), 'every group carries the official name and icon');
-    // every pool enemy is offered by at least one type (the template-slot enemies are hand-assigned: CONFRONT_GROUP_EXTRA)
+    // every offered enemy belongs to the official 特训敌人 pool (the other three types are simply not shown this round)
     const offered = new Set(groups.flatMap((g) => g.rows.map((r) => r.key)));
-    for (const k of confrontPool(m.data.factions)) assert.ok(offered.has(k), `${k} is offered by no type`);
+    const pool = new Set(confrontPool(m.data.factions));
+    for (const k of offered) assert.ok(pool.has(k), `${k} is an official 特训敌人`);
     // the types are NOT equal-valued any more (that rule is gone with the type grouping): 特异 is the big one
     const totals = groups.map((g) => g.rows.reduce((s, r) => s + r.value, 0));
     assert.ok(Math.max(...totals) / Math.min(...totals) - 1 > 0.2, `type sizes differ: ${totals.join('/')}`);

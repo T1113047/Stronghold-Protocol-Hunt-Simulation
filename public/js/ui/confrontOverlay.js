@@ -389,10 +389,11 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
         ${groups.map((g, i) => {
           const total = (g.rows || []).reduce((s, r) => s + r.value, 0);
           const isSel = group === i + 1;
-          return html`<button key=${g.id || i} type="button" class=${cx('confgroup', isSel && 'is-sel')} disabled=${submitted}
+          return html`<button key=${g.id || i} type="button" class=${cx('confgroup', isSel && 'is-sel', g.up && 'is-up')} disabled=${submitted}
             title=${groupDesc(gd, g) || typeLabel(groupName(gd, g))} onClick=${() => setGroup(i + 1)}>
             <span class="confgroup__head">
               <b class="confgroup__name">${g.icon ? html`<${Img} src=${factionIconUrl(m, g.icon)} class="confgroup__ficon" />` : null}${typeLabel(groupName(gd, g)) || `G${i + 1}`}</b>
+              ${g.up ? html`<span class="confgroup__up">UP</span>` : null}
               <span class="confgroup__meta num">${(g.rows || []).length} ${t('种')} · ${t('总价值 {v}', { v: total })}</span>
             </span>
             <span class="confgroup__icons">
