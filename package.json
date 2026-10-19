@@ -1,6 +1,6 @@
 {
   "name": "hunt-simulation",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "《卫戍协议：狩猎模拟》：基于 sganggs/Stronghold-Protocol v0.3.1 的 2V2 狩猎模拟衍生版（Node.js 服务器 + 浏览器客户端，GPL-3.0-or-later，非商业）",
   "upstream": "0.3.1",

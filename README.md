@@ -1,11 +1,11 @@
 # 卫戍协议：狩猎模拟 · Stronghold Protocol: Hunt Simulation
 
-**版本 `V0.0.3（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
+**版本 `V0.0.4（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
 
 > **非官方、非商业、不含游戏素材。** 本仓库与鹰角网络、Yostar 及其关联方没有任何关系；《明日方舟》相关素材版权归原权利人所有，不适用本项目的 GPL。仅供学习交流与个人非商业使用，详见下方[声明](#声明)与 [NOTICE.md](NOTICE.md)。
 
 ![version](https://img.shields.io/badge/version-0.3.1-2ea44f)
-![fork](https://img.shields.io/badge/fork-V0.0.3（0.3.1）-8957e5)
+![fork](https://img.shields.io/badge/fork-V0.0.4（0.3.1）-8957e5)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-22%20%7C%2024-339933)
 
@@ -235,7 +235,7 @@ English summary: [below](#english).
 - **完整包**：附带全部美术 / 音频素材，体积大（约 800 MB，解压后约 1.16 GB），解压就能玩，不需要再下载任何东西。
 - **精简包** `Hunt-Simulation-v0.0.1-lite.zip`（约 25 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
 
-版本 `V0.0.3（0.3.1）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
+版本 `V0.0.4（0.3.1）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
 
 ## 快速开始
 
@@ -453,7 +453,7 @@ node tools/perfbench.mjs --cpu 1,4,6 --profile             # 真实战斗的帧�
 
 ## English
 
-An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess tower-defense **mode *Stronghold Protocol: Alliance***, played in the browser. This fork — **Stronghold Protocol: Hunt Simulation** (`V0.0.3`, built on upstream 0.3.1) — keeps the 1–4 player co-op and makes **the hunt** its core gameplay. In a match, you build during the Rest Phase, then a **Hunting Phase** hands out prey: in **2V2 Hunt Simulation** the four seats form two duos (0/1 vs 2/3) that share one HP pool and place monsters into the opposing team's wave; in **Alliance Hunt** (1–4 player co-op) the server instead gives every living player their own share, with pairwise-distinct totals. Prey that leaks costs no target HP and breaks no perfect-clear; only kills pay.
+An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess tower-defense **mode *Stronghold Protocol: Alliance***, played in the browser. This fork — **Stronghold Protocol: Hunt Simulation** (`V0.0.4`, built on upstream 0.3.1) — keeps the 1–4 player co-op and makes **the hunt** its core gameplay. In a match, you build during the Rest Phase, then a **Hunting Phase** hands out prey: in **2V2 Hunt Simulation** the four seats form two duos (0/1 vs 2/3) that share one HP pool and place monsters into the opposing team's wave; in **Alliance Hunt** (1–4 player co-op) the server instead gives every living player their own share, with pairwise-distinct totals. Prey that leaks costs no target HP and breaks no perfect-clear; only kills pay.
 
 - **The hunt loop:** deploy in the Rest Phase → place prey in the Hunting Phase → kill the opponent's monsters for **bounty** → withdraw bounty from the merchant **Cannot** at the round's rate → the **R13 Final Hunt** (50% ratio, up to 25 bounty, scaled by the kill ratio) → the **R14 Final Assault** → the **R15 Hidden Core**. When a Hunting Phase closes, both teams' lists — who placed what at whom, and the bounty — stay on screen for **5 seconds**.
 - **Bounty is not gold.** Placement bounties are banked with Cannot (per player, kept across rounds). Withdrawal is the only way to turn them into gold: 20% through R8, 30% at R9, +5% per round from R10, 100% at R15; cost = gold ÷ rate, the first withdrawal of a round rounds up and later ones down, at most 4 gold per round (unlimited at R15). Official bounty cards still pay gold directly.
