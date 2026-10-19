@@ -11,7 +11,7 @@ import { RosterPanel } from './rosterPanel.js';
 import { openEntryDetail, entryLook } from './entryDetail.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import {
-  EVENT_CARDS, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_PICK_SECONDS,
+  EVENT_CARDS, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_PICK_SECONDS, EVENT_DURATION_ROUNDS,
 } from '../../../shared/constants.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -182,12 +182,13 @@ export function eliteEffect(key) {
  * line, and `elite` is `m.public.event.foe.elite` for a monster entry. Never throws on an unknown key.
  * @param {'ally'|'foe'} kind
  * @param {any} card an EVENT_CARDS / EVENT_FOE_CARDS row
- * @param {{ mag?: number, round?: number|null, picked?: number|null, target?: string, elite?: any }} [opts]
+ * @param {{ mag?: number, round?: number|null, picked?: number|null, target?: string, elite?: any, duration?: number|null }} [opts]
  */
-export function detailOf(kind, card, { mag = 1, round = null, picked = null, target = 'self', elite = null } = {}) {
+export function detailOf(kind, card, { mag = 1, round = null, picked = null, target = 'self', elite = null, duration = null } = {}) {
   if (!card) return null;
   const ally = kind === 'ally';
   const look = entryLook(kind, card);
+  const rounds = Math.max(1, Math.min(EVENT_DURATION_ROUNDS, Math.trunc(Number(duration ?? card.duration) || EVENT_DURATION_ROUNDS)));
   return {
     kind,
     key: card.key,
@@ -196,6 +197,7 @@ export function detailOf(kind, card, { mag = 1, round = null, picked = null, tar
     base: ally ? allyEffect(card, 1) : foeEffect(card),
     now: ally ? allyEffect(card, mag) : foeEffect(card),
     mag,
+    duration: rounds,
     targetLabel: ally
       ? (TARGET_LABEL[target] ? t(TARGET_LABEL[target]) : t(target))
       : t('本回合的敌人'),

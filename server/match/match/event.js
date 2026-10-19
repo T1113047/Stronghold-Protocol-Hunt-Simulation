@@ -171,10 +171,25 @@ export function eventEvFor(target, sequence = 2) {
 const magMul = (m, mag) => 1 + (m - 1) * mag;
 
 /**
+ * How many rounds one ally entry stays in force: its own `duration` (1 for 经济类负面词条 such as 空手而归, user
+ * 2026-10-19), otherwise EVENT_DURATION_ROUNDS. Clamped to 1 … EVENT_DURATION_ROUNDS.
+ * @param {{ duration?: number }|null|undefined} card an EVENT_CARDS row
+ * @returns {number}
+ */
+export function eventCardDuration(card) {
+  const raw = Math.trunc(Number(card && card.duration));
+  if (Number.isFinite(raw) && raw > 0) return Math.min(raw, EVENT_DURATION_ROUNDS);
+  // all 经济类负面 entries last one round, including any added later without an explicit override
+  if (card && card.class === 'economy' && card.kind === 'down') return 1;
+  return EVENT_DURATION_ROUNDS;
+}
+
+/**
  * Whether a received entry is in force at `round`: it was picked at R and is active in R, R+1, …, R+duration−1
- * (`EVENT_DURATION_ROUNDS` = 4 → [R, R+3]). No `round` (the raw log / hand-built states) keeps every entry; an entry
- * without its own `round` is always in force (the published history carries the round on every real pick).
- * @param {{ round?: number }|null|undefined} entry
+ * (usually `EVENT_DURATION_ROUNDS` = 4 → [R, R+3]; 经济类负面 entries use 1 → [R]). No `round` (the raw log /
+ * hand-built states) keeps every entry; an entry without its own `round` is always in force (the published history
+ * carries the round on every real pick).
+ * @param {{ round?: number, duration?: number, card?: object }|null|undefined} entry
  * @param {number|null} [round] the current absolute round (null = no filter)
  * @returns {boolean}
  */
@@ -185,7 +200,9 @@ export function eventEntryActive(entry, round = null) {
   if (raw == null || raw === '') return true;
   const picked = Number(raw);
   if (!Number.isFinite(picked)) return true;
-  return cur >= picked && cur < picked + EVENT_DURATION_ROUNDS;
+  const own = Math.trunc(Number(entry && entry.duration));
+  const duration = Number.isFinite(own) && own > 0 ? own : eventCardDuration(entry && entry.card);
+  return cur >= picked && cur < picked + Math.min(duration, EVENT_DURATION_ROUNDS);
 }
 
 /** The entries in force at `round` (round null → the whole log, unchanged). */
@@ -435,7 +452,7 @@ export class MatchEvent {
     const rec = { target, targetId: targetPs.playerId, card: card.id, key: card.key, kind: card.kind, mag, auto: !!auto };
     ps.eventTargets.push(target);
     this.event.picks.set(ps.playerId, rec);
-    targetPs.eventEntries.push({ card, mag, from: ps.playerId, round: this.round, target });
+    targetPs.eventEntries.push({ card, duration: eventCardDuration(card), mag, from: ps.playerId, round: this.round, target });
     targetPs.eventMods = eventModsFor(targetPs.eventEntries, this.round);
     this.broadcast({
       t: 'm.event', round: this.round, index: this.event.index, playerId: ps.playerId,
@@ -473,7 +490,7 @@ export class MatchEvent {
       const target = this.botEventTarget(ps);
       if (target) this._eventPick(ps, target, { auto: true });
     }
-    for (const [playerId, rec] of ev.picks) this.eventHistory.push({ round: ev.round, index: ev.index, playerId, ...rec });
+    for (const [playerId, rec] of ev.picks) this.eventHistory.push({ round: ev.round, index: ev.index, playerId, ...rec, duration: eventCardDuration(rec.card) });
     ev.done = true;
     this._eventDoneRound = this.round;
     this.markPublic();

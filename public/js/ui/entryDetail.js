@@ -82,7 +82,7 @@ export function EntryDetailDialog({ detail, onClose }) {
   if (!detail) return null;
   const ally = detail.kind === 'ally';
   const mag = Number(detail.mag) || 1;
-  const duration = EVENT_DURATION_ROUNDS;
+  const duration = Math.max(1, Math.min(EVENT_DURATION_ROUNDS, Math.trunc(Number(detail.duration) || EVENT_DURATION_ROUNDS)));
   const picked = detail.picked != null && Number.isFinite(Number(detail.picked)) ? Number(detail.picked) : null;
   const round = detail.round != null && Number.isFinite(Number(detail.round)) ? Number(detail.round) : null;
   const left = picked != null && round != null ? Math.max(0, picked + duration - round) : null;

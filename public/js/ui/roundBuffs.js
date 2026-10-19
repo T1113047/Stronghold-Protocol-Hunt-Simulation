@@ -45,20 +45,22 @@ export function roundBuffRows(pub, myId) {
   const foe = ev.foe || null;
   const targets = ally.targets && typeof ally.targets === 'object' ? ally.targets : {};
   const history = Array.isArray(ally.history) ? ally.history : [];
-  const duration = Math.max(1, Math.trunc(Number(ally.duration) || EVENT_DURATION_ROUNDS));
+  const fallbackDuration = Math.max(1, Math.trunc(Number(ally.duration) || EVENT_DURATION_ROUNDS));
   const rows = [];
   for (const rec of history) {
     const picked = Math.trunc(Number(rec && rec.round));
-    if (!Number.isFinite(picked) || round < picked || round >= picked + duration) continue;
-    if (eventReceiver(rec, targets) !== myId) continue;
+    if (!Number.isFinite(picked)) continue;
     const card = eventAllyCard(rec);
     if (!card) continue;
+    const duration = Math.max(1, Math.trunc(Number(rec.duration ?? card.duration) || fallbackDuration));
+    if (round < picked || round >= picked + duration) continue;
+    if (eventReceiver(rec, targets) !== myId) continue;
     const mag = Number(rec.mag) || 1;
     const name = t(ALLY_NAMES[card.key] || card.key);
     const effect = allyEffect(card, mag);
     rows.push({
       kind: 'ally', key: card.key, name, effect, elite: '', title: effect ? `${name} ${effect}` : name,
-      detail: detailOf('ally', card, { mag, picked, round, target: 'self' }),
+      detail: detailOf('ally', card, { mag, picked, round, target: 'self', duration }),
     });
   }
   if (foe && Number(foe.round) === round) {

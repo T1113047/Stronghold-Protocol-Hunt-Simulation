@@ -111,6 +111,18 @@ test('nothing renders outside a hunt mode, without an event this round, or for a
   assert.deepEqual(roundBuffRows(mine, 'a'), [], 'an entry given to a teammate is not mine');
 });
 
+test('经济类负面词条（空手而归）在 P4 词条条只显示 1 回合，弹窗显示持续 1 回合', () => {
+  const pub = pubWith([{ round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 23, key: 'empty_handed', kind: 'down', mag: 2 }]);
+  pub.event.foe = null;
+  const r8 = roundBuffRows(pub, 'a');
+  assert.equal(r8.length, 1);
+  assert.equal(r8[0].detail.duration, 1);
+  assert.equal(r8[0].effect, '每回合金币 -6', 'self doubles the -3');
+  pub.round = 9;
+  pub.event.ally.round = 9;
+  assert.deepEqual(roundBuffRows(pub, 'a'), [], 'the economy debuff is gone after its own round');
+});
+
 test('the component reuses the 事件期 overlay: no second card table, no new msgid, one line per row under P4', () => {
   const src = read('public/js/ui/roundBuffs.js');
   const team = read('public/js/ui/teamPanel.js');

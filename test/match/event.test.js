@@ -13,7 +13,7 @@ import {
 import { validateC2S } from '../../shared/protocol.js';
 import {
   eventCardById, eventCardByKey, eventKindOf, eventMagnitude, eventModsFor, eventEvFor, eventBattleRefs,
-  eventEntryActive, eventActiveEntries, eventFoeCardById, eventFoeCardByKey, eventFoeKindOf, eventFoeEv,
+  eventEntryActive, eventActiveEntries, eventCardDuration, eventFoeCardById, eventFoeCardByKey, eventFoeKindOf, eventFoeEv,
   eventFoeMeanEv, eventFoeEliteByKey,
 } from '../../server/match/match/event.js';
 import { createRng } from '../../server/sim/rng.js';
@@ -617,6 +617,20 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     // entries without a round (hand-built states / the raw log) are never filtered
     assert.ok(Math.abs(eventModsFor([{ card: C('whetstone'), mag: 1 }], 99).atkPct - 0.20) < 1e-12);
     assert.equal(eventBattleRefs([{ card: C('whetstone'), mag: 1 }], 99).length, 1);
+  });
+
+  test('经济类负面词条（空手而归）只持续 1 回合', () => {
+    const card = C('empty_handed');
+    assert.ok(card, 'empty_handed exists');
+    assert.equal(eventCardDuration(card), 1);
+    const entry = { card, duration: 1, mag: 1, round: 8 };
+    assert.equal(eventEntryActive(entry, 8), true);
+    assert.equal(eventEntryActive(entry, 9), false);
+    assert.equal(eventModsFor([entry], 8).goldPerRound, -3);
+    assert.equal(eventModsFor([entry], 9).goldPerRound, 0);
+    // a normal entry still lasts the full 4 rounds
+    assert.equal(eventCardDuration(C('whetstone')), EVENT_DURATION_ROUNDS);
+    assert.equal(eventEntryActive({ card: C('whetstone'), mag: 1, round: 8 }, 11), true);
   });
 
   test('a picked entry holds for 4 rounds, then income / battle refs return to the baseline (startRound re-derives)', () => {
