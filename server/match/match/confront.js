@@ -273,9 +273,11 @@ export class MatchConfront {
     const share = Math.max(0, Math.min(0.9, Number(this.huntCfg().traitShare) || 0));
     let stat = 0;
     let steps = 0;
+    const times = this.confrontTimesKeys();
     for (const k of confrontPool(this.data && this.data.factions)) {
       if (!en[k]) continue;
-      stat += confrontValue(en[k], scale);
+      // the same stat half confrontValueOf prices: 频次怪's manual 1.5× (user 2026-10-21) is part of the table's base
+      stat += Math.round(confrontValue(en[k], scale) * (times.has(k) ? 1.5 : 1));
       steps += scores[confrontTraitGrade(k) - 1] || 0;
     }
     this._traitStep = steps > 0 ? Math.round((share / (1 - share)) * stat / steps) : 0;
@@ -295,7 +297,21 @@ export class MatchConfront {
     const e = en[enemyKey];
     if (!e) return 0;
     const step = this.huntCfg().traitStepScores[confrontTraitGrade(enemyKey) - 1] || 0;
-    return confrontValue(e, scale || this.confrontScale()) + this.confrontTraitStep() * step;
+    // 频次怪 (factions.types.TIMES, user 2026-10-21): priced 1.5× by hand — the same 增值 treatment 远程怪 (applyWay
+    // RANGED) got on 2026-10-18 (confrontValue's stat half × 1.5), so the trait half is untouched and keeps its share.
+    // A monster that is BOTH 频次 and 远程 stacks the two multipliers (×2.25 on the stat half).
+    const times = this.confrontTimesKeys().has(enemyKey) ? 1.5 : 1;
+    return Math.round(confrontValue(e, scale || this.confrontScale()) * times) + this.confrontTraitStep() * step;
+  }
+
+  /** The 频次怪 (TIMES) type's monster keys (pool + entries), cached — confrontValueOf prices them 1.5× (user 2026-10-21). */
+  confrontTimesKeys() {
+    if (!this._confrontTimesKeys) {
+      const types = (this.data && this.data.factions && this.data.factions.types) || {};
+      const times = types.TIMES || {};
+      this._confrontTimesKeys = new Set([...(times.pool || []), ...(times.entries || [])]);
+    }
+    return this._confrontTimesKeys;
   }
 
   /**

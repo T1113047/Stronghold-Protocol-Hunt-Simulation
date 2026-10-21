@@ -35,10 +35,12 @@ describe('狩猎期 特性分档 (2V2)', () => {
     assert.ok(step > 0, `a positive 特性 step (${step})`);
     let stat = 0;
     let graded = 0;
+    const times = m.confrontTimesKeys();
     for (const k of confrontPool(m.data.factions)) {
       const e = m.data.enemies[k];
       if (!e) continue;
-      const s = confrontValue(e, scale);
+      // the SAME base confrontValueOf prices: 频次怪 (TIMES) carries its manual 1.5× (user 2026-10-21) on the stat half
+      const s = Math.round(confrontValue(e, scale) * (times.has(k) ? 1.5 : 1));
       const v = m.confrontValueOf(k, scale);
       const g = confrontTraitGrade(k);
       stat += s;
@@ -48,6 +50,24 @@ describe('狩猎期 特性分档 (2V2)', () => {
     }
     const share = graded / (stat + graded);
     assert.ok(Math.abs(share - VERSUS_CONFRONT.traitShare) < 0.005, `the 特性 part is ${(share * 100).toFixed(2)} % of the table`);
+  });
+
+  test('频次怪（TIMES）的手动 1.5 倍计价（user 2026-10-21）', () => {
+    const m = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 11, fake: true }).start().m;
+    const scale = m.confrontScale();
+    const times = [...m.confrontTimesKeys()];
+    assert.ok(times.length >= 10, `the TIMES type lists its monsters (${times.length})`);
+    const pool = new Set(confrontPool(m.data.factions));
+    const scores = m.huntCfg().traitStepScores;
+    let n = 0;
+    for (const k of times) {
+      if (!pool.has(k) || !m.data.enemies[k]) continue;
+      const raw = confrontValue(m.data.enemies[k], scale);
+      const trait = m.confrontTraitStep() * (scores[confrontTraitGrade(k) - 1] || 0);
+      assert.equal(m.confrontValueOf(k, scale), Math.round(raw * 1.5) + trait, `${k}: stat half × 1.5 + its trait step`);
+      n++;
+    }
+    assert.ok(n >= 10, `${n} TIMES monsters priced 1.5×`);
   });
 
   test('the priced value is what the groups, a submission and the bounty use', () => {
