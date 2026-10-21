@@ -868,6 +868,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* a taken candidate is greyed — but stays tappable (it cancels the pick), so never :disabled here */
 .cchip--boss.is-picked { opacity: .45; filter: grayscale(.55); border-color: var(--gold-2); }
 .cchip--boss.is-picked .cchip__count { color: var(--gold-2); }
+.cchip--boss.is-locked { opacity: .38; filter: grayscale(.7); cursor: not-allowed; }
 .confovb__note { display: flex; align-items: flex-start; gap: .08rem; margin: 0; padding: .08rem .12rem; flex: 0 0 auto;
   border: 1px solid var(--gold-2); border-left-width: 3px; background: rgba(242, 189, 62, .12); color: #ffe6ad;
   font-size: max(calc(.15 * var(--t)), 10px); font-weight: 700; line-height: 1.55; }

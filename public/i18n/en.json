@@ -2256,11 +2256,8 @@
   "赏金 +{n}": "Bounty +{n}",
   "击杀对面派来的猎物，赏金归己方": "Killing a monster the other team sent pays YOUR team",
   "boss": "boss",
-  "boss ×{n}": "boss ×{n}",
-  "boss 候选（点击选择，每种至多选 1 次，不限总数）": "Boss candidates (tap to pick; each at most once, any number in total)",
   "金币 {n}": "Gold {n}",
   "boss 被击杀后，击杀方按机变口径直接获得金币（不进坎诺特赏金账本），漏掉不给；boss 只会从波次最后入场。": "When a boss is killed, the killing side gains gold directly (Improv wording — it never enters Cannot's bounty ledger); a boss that leaks pays nothing. A boss always enters last, at the very back of the wave.",
-  "已选的再点一下取消；每轮重置": "Tap a taken one again to cancel; the pick resets every round",
   "猎物漏过不扣目标生命": "A hunted monster that leaks costs no target HP",
   "快速匹配": "Quick Match",
   "开放匹配": "Open to matchmaking",
@@ -2481,5 +2478,8 @@
   "本期事件词条": "This period's event entries",
   "最后一回合：还有赏金未取出，点击坎诺特兑换": "Last round: bounty is still banked — open Cantor to withdraw it",
   "最后回合 · 取出赏金": "Last round · withdraw",
-  "剩 {n} 回合": "{n} rounds left"
+  "剩 {n} 回合": "{n} rounds left",
+  "boss 候选（点击选择，每种至多选 1 次；本轮上限 {cap} 个）": "Boss candidates (tap to pick; each at most once — up to {cap} this round)",
+  "boss 已选 {n}/{cap}": "boss {n} of {cap} taken",
+  "选满上限自动返回；已选的再点一下取消；每轮重置": "Returns to the panel automatically at the cap; tap a taken one again to cancel; resets every round"
 }

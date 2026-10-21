@@ -167,9 +167,10 @@ export const VERSUS_CONFRONT = Object.freeze({
   ...HUNT_RHYTHM,
   /**
    * The boss 格 (user 2026-10-21): on the 事件期 rounds (match.eventRounds) the 定制 panel adds one more slot offering the
-   * whole 机变悬赏 monster pool (data/choices.json bountyDrafts). A submission may name at most this many bosses — the
-   * same bound the protocol's `g.confront.bosses` list carries (shared/protocol.js `isList(…, 32, …)`). Bosses cost NO
-   * budget and count against NO maxPicks; within one submission an enemyKey may be named only once.
+   * whole 机变悬赏 monster pool (data/choices.json bountyDrafts). This is only the WIRE bound of `g.confront.bosses`
+   * (shared/protocol.js `isList(…, 32, …)`); the real cap is the event's own ordinal — `confrontBossCap()` = 1 / 2 / 3
+   * on E1 / E2 / E3 (user 2026-10-21 after playtest). Bosses cost NO budget and count against NO maxPicks; within one
+   * submission an enemyKey may be named only once.
    */
   maxBosses: 32,
 });

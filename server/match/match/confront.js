@@ -394,6 +394,17 @@ export class MatchConfront {
   }
 
   /**
+   * How many bosses ONE submission may name this round (user 2026-10-21, after playtest): the cap is the EVENT's own
+   * ordinal — 1 boss on the round of the 1st event, 2 on the 2nd, 3 on the 3rd (R4 / R8 / R13 of a R4 start). Zero on
+   * every round the slot does not exist on. The panel greys the rest out at the cap and the server refuses more
+   * (ERR.CONFRONT_COUNT), so "不限数量" from the first draft is gone.
+   */
+  confrontBossCap() {
+    if (!this.confrontBossOpen() || !Array.isArray(this.eventRounds)) return 0;
+    return Math.max(0, this.eventRounds.indexOf(this.round) + 1);
+  }
+
+  /**
    * The boss 格's pool (confrontBossCoins), named through gd.enemy: every 机变悬赏 monster, at its highest coin tier.
    * Data, not round state — computed once and cached, sorted by key so the panel order is stable.
    * @returns {Array<{ key: string, name: string, coin: number }>}
@@ -918,8 +929,8 @@ export class MatchConfront {
    *
    * `bosses` (the 事件期 boss 格, user 2026-10-21) is checked on its own: every enemyKey must be in the 机变悬赏 pool
    * (confrontBossPool — and the round must be an event round at all), an enemyKey may appear at most ONCE per submission
-   * ([ASSUMED] error code: a repeat is a count offence ⇒ ERR.CONFRONT_COUNT), and at most VERSUS_CONFRONT.maxBosses of
-   * them. Bosses pay NO budget and count against NO maxPicks — `picks` may even be empty, a boss-only submission is a
+   * ([ASSUMED] error code: a repeat is a count offence ⇒ ERR.CONFRONT_COUNT), and at most `confrontBossCap()` of
+   * them (the event's own ordinal: E1 = 1 / E2 = 2 / E3 = 3, user 2026-10-21 after playtest). Bosses pay NO budget and count against NO maxPicks — `picks` may even be empty, a boss-only submission is a
    * legal one.
    * @returns {{ sub: object }|{ error: string }|null} null = malformed (unknown monster / gate / position)
    */
@@ -937,7 +948,6 @@ export class MatchConfront {
     if (out.length > VERSUS_CONFRONT.maxPicks) return { error: ERR.CONFRONT_COUNT };
     if (this.confrontSpent(out) > this.confrontBudget()) return { error: ERR.CONFRONT_BUDGET };
     const bArr = Array.isArray(bosses) ? bosses : [];
-    if (bArr.length > VERSUS_CONFRONT.maxBosses) return { error: ERR.CONFRONT_COUNT };
     // outside the 事件期 rounds the boss 格 does not exist, so the pool is empty and any boss is refused with it
     const bossAllowed = this.confrontBossOpen() ? new Set(this.confrontBossPool().map((r) => r.key)) : new Set();
     const outB = [];
@@ -946,6 +956,9 @@ export class MatchConfront {
       if (outB.some((x) => x.enemyKey === p.enemyKey)) return { error: ERR.CONFRONT_COUNT };
       outB.push({ enemyKey: p.enemyKey, gate: p.gate === 'upper' ? 'upper' : 'lower' });
     }
+    // the cap is the event's own ordinal (confrontBossCap: E1 = 1, E2 = 2, E3 = 3; user 2026-10-21 after playtest) —
+    // over the cap is a count offence; off the event rounds the cap is 0 and the empty pool above already refused
+    if (outB.length > this.confrontBossCap()) return { error: ERR.CONFRONT_COUNT };
     const gi = Number.isInteger(group) && group >= 1 && group <= list.length ? group : 1;
     return { sub: { target: this.confrontTargets.get(ps.playerId) ?? null, group: gi, position: pos, picks: out, bosses: outB, total: out.length, ratio: this.confrontRatio(), budget: this.confrontBudget(), seat: ps.seat } };
   }

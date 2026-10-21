@@ -168,25 +168,28 @@ function EnemyChip({ m, rec, count, onAdd, disabled, blocked, hint }) {
 
 /**
  * The boss 选择页 of an EVENT round (R4 / R8 / R13; the type row's 5th cell): the candidates of the server's boss pool
- * (m.public.confront.bossPool), each as its icon + monster name + the gold a kill pays. No selection limit, but a
- * candidate may be taken AT MOST ONCE (a taken one greys out and a tap cancels it — `aria-pressed`, never `disabled`,
- * so the cancel stays tappable); the selection resets every round. The bosses ride along with this round's placement to
- * the opponent and always enter at the very back of the wave, and they cost NO budget: the picking columns ignore them,
- * the `boss ×N` summary is its own line. The 特别说明 block is the rule that is easy to get wrong — a killed boss pays
- * GOLD DIRECTLY to the killing side (机变 wording, never through the 坎诺特 bounty ledger), a leaked one pays nothing.
- * @param {{ m:any, pool:any[], bosses:object[], submitted?:boolean, onToggle:(b:any)=>void }} props
+ * (m.public.confront.bossPool), each as its icon + monster name + the gold a kill pays. The selection cap is the
+ * EVENT's own ordinal (m.public.confront.bossCap = 1 / 2 / 3 on E1 / E2 / E3; user 2026-10-21 after playtest): at it
+ * the rest greys out (disabled) and the page closes by itself back to the normal panel. A candidate may be taken AT
+ * MOST ONCE (a taken one is `aria-pressed` and stays tappable to cancel), the selection resets every round. The bosses
+ * ride along with this round's placement to the opponent and always enter at the very back of the wave, and they cost
+ * NO budget: the picking columns ignore them, the boss summary is its own line. The 特别说明 block is the rule that is
+ * easy to get wrong — a killed boss pays GOLD DIRECTLY to the killing side (机变 wording, never through the 坎诺特
+ * bounty ledger), a leaked one pays nothing.
+ * @param {{ m:any, pool:any[], bosses:object[], cap:number, submitted?:boolean, onToggle:(b:any)=>void }} props
  */
-function BossPanel({ m, pool, bosses, submitted = false, onToggle }) {
+function BossPanel({ m, pool, bosses, cap = 0, submitted = false, onToggle }) {
   const gd = useGameData();
+  const atCap = cap > 0 && bosses.length >= cap;
   return html`<section class="confovb" data-testid="confront-boss-page">
-    <h3 class="confov__h">${t('boss 候选（点击选择，每种至多选 1 次，不限总数）')}
-      <span class="num t-dim">${t('boss ×{n}', { n: bosses.length })}</span></h3>
+    <h3 class="confov__h">${t('boss 候选（点击选择，每种至多选 1 次；本轮上限 {cap} 个）', { cap })}
+      <span class="num t-dim">${t('boss 已选 {n}/{cap}', { n: bosses.length, cap })}</span></h3>
     <div class="confov__chips confovb__chips">
       ${pool.map((b) => {
         const picked = bosses.some((x) => x.enemyKey === b.key);
         const name = enemyName(gd, b.key, b.name);
-        return html`<button key=${b.key} type="button" class=${cx('cchip', 'cchip--boss', picked && 'is-picked')}
-          disabled=${submitted} aria-pressed=${picked ? 'true' : 'false'} data-testid="confront-boss-chip"
+        return html`<button key=${b.key} type="button" class=${cx('cchip', 'cchip--boss', picked && 'is-picked', !picked && atCap && 'is-locked')}
+          disabled=${submitted || (!picked && atCap)} aria-pressed=${picked ? 'true' : 'false'} data-testid="confront-boss-chip"
           title=${`${name}（${t('金币 {n}', { n: b.coin })}）`} onClick=${() => onToggle(b)}>
           <span class="cchip__icon"><${Img} src=${enemyIconUrl(m, b.key)} fallback=${html`<${GIcon} name="target" />`} /></span>
           <span class="cchip__name">${name}</span>
@@ -196,7 +199,7 @@ function BossPanel({ m, pool, bosses, submitted = false, onToggle }) {
       })}
     </div>
     <p class="confovb__note" data-testid="confront-boss-note"><${Icon} name="warn" />${t('boss 被击杀后，击杀方按机变口径直接获得金币（不进坎诺特赏金账本），漏掉不给；boss 只会从波次最后入场。')}</p>
-    <p class="confovb__tip t-dim">${t('已选的再点一下取消；每轮重置')}</p>
+    <p class="confovb__tip t-dim">${t('选满上限自动返回；已选的再点一下取消；每轮重置')}</p>
   </section>`;
 }
 
@@ -220,6 +223,8 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
   const groups = Array.isArray(conf.groups) ? conf.groups : [];
   // the boss pool of the EVENT rounds (R4 / R8 / R13) — absent everywhere else, where the 5th cell is not rendered at all
   const bossPool = Array.isArray(conf.bossPool) ? conf.bossPool : [];
+  // the boss 格's per-round cap (user 2026-10-21 after playtest): the event's own ordinal — E1 = 1 / E2 = 2 / E3 = 3
+  const bossCap = Math.max(0, Math.trunc(Number(conf.bossCap) || 0));
   const players = pub.players || [];
   const me = players.find((p) => p.playerId === myId) || null;
   const myTeam = me ? me.team : null;
@@ -279,7 +284,13 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
   // taken one cancels it. Any number of bosses in total; none of them is in `picks`, so none spends budget.
   const toggleBoss = (b) => {
     if (submitted || busy) return;
-    setBosses((p) => (p.some((x) => x.enemyKey === b.key) ? p.filter((x) => x.enemyKey !== b.key) : [...p, { enemyKey: b.key, gate: 'lower' }]));
+    const taken = bosses.some((x) => x.enemyKey === b.key);
+    // the cap is the event's own ordinal (conf.bossCap, user 2026-10-21 after playtest): at it the rest is grey
+    if (!taken && bossCap > 0 && bosses.length >= bossCap) return;
+    const next = taken ? bosses.filter((x) => x.enemyKey !== b.key) : [...bosses, { enemyKey: b.key, gate: 'lower' }];
+    setBosses(next);
+    // reaching the cap closes the page by itself (user 2026-10-21): the last pick returns to the normal panel
+    if (!taken && bossCap > 0 && next.length >= bossCap) setBossPage(false);
   };
   // 队列交互: a placed monster defaults to 下路 — TAP it to switch the gate, PRESS AND HOLD it to drag it in the order.
   // (The up/down buttons and the per-row gate buttons are gone: both actions live on the row itself.)
@@ -456,10 +467,10 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
           </button>`;
         })}
         ${bossPool.length ? html`<button key="boss" type="button" class=${cx('confgroup', 'confgroup--boss', bossPage && 'is-sel')} disabled=${submitted}
-          data-testid="confront-boss-cell" title=${t('boss 候选（点击选择，每种至多选 1 次，不限总数）')} onClick=${() => setBossPage(true)}>
+          data-testid="confront-boss-cell" title=${t('boss 候选（点击选择，每种至多选 1 次；本轮上限 {cap} 个）', { cap: bossCap })} onClick=${() => setBossPage(true)}>
           <span class="confgroup__head">
             <b class="confgroup__name confgroup__name--boss">${t('boss')}</b>
-            <span class="confgroup__meta num">${t('boss ×{n}', { n: bosses.length })}</span>
+            <span class="confgroup__meta num">${t('boss 已选 {n}/{cap}', { n: bosses.length, cap: bossCap })}</span>
           </span>
           <span class="confgroup__icons">
             ${bossPool.map((b) => html`<span key=${b.key} class="confgroup__ic" title=${`${enemyName(gd, b.key, b.name)}（${t('金币 {n}', { n: b.coin })}）`}>
@@ -468,7 +479,7 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
         </button>` : null}
       </div>
 
-      ${bossPage ? html`<${BossPanel} m=${m} pool=${bossPool} bosses=${bosses} submitted=${submitted} onToggle=${toggleBoss} />`
+      ${bossPage ? html`<${BossPanel} m=${m} pool=${bossPool} bosses=${bosses} cap=${bossCap} submitted=${submitted} onToggle=${toggleBoss} />`
         : group != null ? html`<div class="confov__body">
         <section class="confov__pool">
           <h3 class="confov__h">${t('{g} 的怪物（点击加入）', { g: typeLabel(groupName(gd, groups[group - 1])) || t('G{n}', { n: group }) })} <span class="num t-dim">${t('剩余价值 {v}', { v: remaining })}</span></h3>
@@ -495,7 +506,7 @@ export function ConfrontOverlay({ pub, busy = false, onTarget, onConfirm }) {
               </li>`;
             })}
           </ol>` : html`<p class="confov__empty t-dim">${t('还没有放置怪物')}</p>`}
-          ${bossPool.length ? html`<p class="confovb__sum" data-testid="confront-boss-summary">${t('boss ×{n}', { n: bosses.length })}</p>` : null}
+          ${bossPool.length ? html`<p class="confovb__sum" data-testid="confront-boss-summary">${t('boss 已选 {n}/{cap}', { n: bosses.length, cap: bossCap })}</p>` : null}
           <p class="confov__hint t-dim">${t('猎物漏过不扣目标生命')}</p>
           <h3 class="confov__h">${t('出怪位置')}</h3>
           <div class="confpos">

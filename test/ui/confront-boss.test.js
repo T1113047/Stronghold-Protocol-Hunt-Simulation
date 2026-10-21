@@ -29,11 +29,11 @@ const HAN = /[\u3400-\u9fff\uf900-\ufaff]/;
 const NOTE = 'boss 被击杀后，击杀方按机变口径直接获得金币（不进坎诺特赏金账本），漏掉不给；boss 只会从波次最后入场。';
 const MSGIDS = [
   'boss',
-  'boss ×{n}',
-  'boss 候选（点击选择，每种至多选 1 次，不限总数）',
+  'boss 已选 {n}/{cap}',
+  'boss 候选（点击选择，每种至多选 1 次；本轮上限 {cap} 个）',
   '金币 {n}',
   NOTE,
-  '已选的再点一下取消；每轮重置',
+  '选满上限自动返回；已选的再点一下取消；每轮重置',
 ];
 
 /** The msgid must be translated in every pack (the English one carries no Chinese). */
@@ -52,29 +52,34 @@ test('#1 the 5th cell renders only with a boss pool; the type cards are untouche
   // the pool comes from the round's public state and is empty (so the cell is absent) on every other round
   assert.match(OVERLAY, /const bossPool = Array\.isArray\(conf\.bossPool\) \? conf\.bossPool : \[\];/);
   assert.match(OVERLAY, /\$\{bossPool\.length \? html`<button key="boss" type="button" class=\$\{cx\('confgroup', 'confgroup--boss', bossPage && 'is-sel'\)\} disabled=\$\{submitted\}/);
-  assert.match(OVERLAY, /data-testid="confront-boss-cell" title=\$\{t\('boss 候选（点击选择，每种至多选 1 次，不限总数）'\)\} onClick=\$\{\(\) => setBossPage\(true\)\}/);
+  assert.match(OVERLAY, /data-testid="confront-boss-cell" title=\$\{t\('boss 候选（点击选择，每种至多选 1 次；本轮上限 \{cap\} 个）', \{ cap: bossCap \}\)\} onClick=\$\{\(\) => setBossPage\(true\)\}/);
   // its name is `boss`, its meta is the boss ×N summary, its icons are the pool's own candidates (name + gold in the title)
   assert.match(OVERLAY, /<b class="confgroup__name confgroup__name--boss">\$\{t\('boss'\)\}<\/b>/);
-  assert.match(OVERLAY, /<span class="confgroup__meta num">\$\{t\('boss ×\{n\}', \{ n: bosses\.length \}\)\}<\/span>/);
+  assert.match(OVERLAY, /<span class="confgroup__meta num">\$\{t\('boss 已选 \{n\}\/\{cap\}', \{ n: bosses\.length, cap: bossCap \}\)\}<\/span>/);
   assert.match(OVERLAY, /title=\$\{`\$\{enemyName\(gd, b\.key, b\.name\)\}（\$\{t\('金币 \{n\}', \{ n: b\.coin \}\)\}）`\}/);
   // the 4 / 7 type cards render exactly as before — only their selected state and click know about the boss page
   assert.match(OVERLAY, /const isSel = !bossPage && group === i \+ 1;/);
   assert.match(OVERLAY, /onClick=\$\{\(\) => \{ setBossPage\(false\); setGroup\(i \+ 1\); \}\}/);
-  assert.match(OVERLAY, /\$\{bossPage \? html`<\$\{BossPanel\} m=\$\{m\} pool=\$\{bossPool\} bosses=\$\{bosses\} submitted=\$\{submitted\} onToggle=\$\{toggleBoss\} \/>`\s*: group != null \? html`<div class="confov__body">/);
+  assert.match(OVERLAY, /\$\{bossPage \? html`<\$\{BossPanel\} m=\$\{m\} pool=\$\{bossPool\} bosses=\$\{bosses\} cap=\$\{bossCap\} submitted=\$\{submitted\} onToggle=\$\{toggleBoss\} \/>`\s*: group != null \? html`<div class="confov__body">/);
   assert.match(OVERLAY, /: html`<p class="confov__hint t-dim">\$\{t\('先选择上面的一个怪物组'\)\}<\/p>`\}/);
 });
 
-test('#2 each candidate at most once — a taken one greys out, a tap cancels, the round resets the pick', () => {
-  // one pick per key: the toggle only appends when the key is not taken yet (no count cap on the TOTAL)
-  assert.match(OVERLAY, /setBosses\(\(p\) => \(p\.some\(\(x\) => x\.enemyKey === b\.key\) \? p\.filter\(\(x\) => x\.enemyKey !== b\.key\) : \[\.\.\.p, \{ enemyKey: b\.key, gate: 'lower' \}\]\)\);/);
+test('#2 one pick per candidate, the cap greys the rest and closes the page (E1 = 1 / E2 = 2 / E3 = 3)', () => {
+  // one pick per key: the toggle only appends when the key is not taken yet; at the CAP (the event's ordinal,
+  // user 2026-10-21 after playtest) it appends no more and the page returns to the normal panel by itself
+  assert.match(OVERLAY, /const taken = bosses\.some\(\(x\) => x\.enemyKey === b\.key\);/);
+  assert.match(OVERLAY, /if \(!taken && bossCap > 0 && bosses\.length >= bossCap\) return;/);
+  assert.match(OVERLAY, /const next = taken \? bosses\.filter\(\(x\) => x\.enemyKey !== b\.key\) : \[\.\.\.bosses, \{ enemyKey: b\.key, gate: 'lower' \}\];/);
+  assert.match(OVERLAY, /if \(!taken && bossCap > 0 && next\.length >= bossCap\) setBossPage\(false\);/);
   assert.match(OVERLAY, /if \(submitted \|\| busy\) return;/);
-  // the taken chip is greyed but NOT disabled (a tap on it cancels) and says so to assistive tech
-  assert.match(OVERLAY, /class=\$\{cx\('cchip', 'cchip--boss', picked && 'is-picked'\)\}/);
+  // the taken chip greys but stays tappable (a tap cancels); the ones locked by the cap are disabled
+  assert.match(OVERLAY, /class=\$\{cx\('cchip', 'cchip--boss', picked && 'is-picked', !picked && atCap && 'is-locked'\)\}/);
   assert.match(OVERLAY, /aria-pressed=\$\{picked \? 'true' : 'false'\} data-testid="confront-boss-chip"/);
-  assert.match(OVERLAY, /disabled=\$\{submitted\} aria-pressed=/);
+  assert.match(OVERLAY, /disabled=\$\{submitted \|\| \(!picked && atCap\)\} aria-pressed=/);
   assert.match(CSS, /\.cchip--boss\.is-picked \{ opacity: \.45; filter: grayscale\(\.55\); border-color: var\(--gold-2\); \}/);
+  assert.match(CSS, /\.cchip--boss\.is-locked \{ opacity: \.38; filter: grayscale\(\.7\); cursor: not-allowed; \}/);
   // the page says how the toggle works, and every round starts clean
-  assert.match(OVERLAY, /t\('已选的再点一下取消；每轮重置'\)/);
+  assert.match(OVERLAY, /t\('选满上限自动返回；已选的再点一下取消；每轮重置'\)/);
   assert.match(OVERLAY, /useEffect\(\(\) => \{ setGroup\(null\); setPicks\(\[\]\); setPosition\('mid'\); setBosses\(\[\]\); setBossPage\(false\); \}, \[conf && conf\.round\]\);/);
 });
 
@@ -134,7 +139,7 @@ test('#5 a boss costs no budget: the bar counts only picks, the boss ×N summary
   assert.ok(!/spent = .*bosses/.test(OVERLAY), 'no boss in the spent value');
   assert.match(OVERLAY, /<h3 class="confov__h">\$\{t\('已放置（出怪顺序）'\)\} <span class="num">\$\{picks\.length\} · \$\{spent\}\/\$\{budget\}<\/span><\/h3>/);
   // …and the summary is a line of its own, shown on the event rounds only
-  assert.match(OVERLAY, /class="confovb__sum" data-testid="confront-boss-summary">\$\{t\('boss ×\{n\}', \{ n: bosses\.length \}\)\}<\/p>/);
+  assert.match(OVERLAY, /class="confovb__sum" data-testid="confront-boss-summary">\$\{t\('boss 已选 \{n\}\/\{cap\}', \{ n: bosses\.length, cap: bossCap \}\)\}<\/p>/);
   assert.match(OVERLAY, /\$\{bossPool\.length \? html`<p class="confovb__sum"/);
   assert.match(CSS, /\.confovb__sum \{ margin: \.05rem 0 0; padding: \.03rem \.08rem; flex: 0 0 auto; border-left: 2px solid var\(--gold-2\);/);
 });

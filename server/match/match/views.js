@@ -133,8 +133,10 @@ export class MatchViews {
               rows: g.rows.map((r) => ({ key: r.key, name: r.name, value: r.value })),
             })),
             // 事件期 boss 格 (user 2026-10-21): the whole 机变悬赏 monster pool, each at its highest coin tier — only on
-            // the event rounds (match.eventRounds), `null` on every other 对抗期 round (the 5th slot does not exist there)
+            // the event rounds (match.eventRounds), `null` on every other 对抗期 round (the 5th slot does not exist there).
+            // `bossCap` is how many ONE submission may name this round (the event's ordinal: E1 = 1 / E2 = 2 / E3 = 3).
             bossPool: this.confrontBossOpen() ? this.confrontBossPool() : null,
+            bossCap: this.confrontBossCap(),
             subs,
           },
         };

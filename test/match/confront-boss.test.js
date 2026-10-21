@@ -114,34 +114,62 @@ describe('2V2 事件期 boss 格: 提交校验', () => {
     const m = h.m;
     const me = m.players.get('p_0');
     const pool = m.confrontBossPool();
-    const [a, b] = pool;
+    const a = pool[0];
     // a monster outside the 机变悬赏 pool (and an unknown key) is malformed → BAD_TARGET
     const outside = Object.keys(DATA.enemies).find((k) => !pool.some((r) => r.key === k));
     assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: [{ enemyKey: outside }] }).error, ERR.BAD_TARGET);
     assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: [{ enemyKey: 'enemy_does_not_exist' }] }).error, ERR.BAD_TARGET);
     // the same monster twice in ONE submission: one pick per option per round ([ASSUMED] ERR.CONFRONT_COUNT)
     assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: [{ enemyKey: a.key }, { enemyKey: a.key }] }).error, ERR.CONFRONT_COUNT);
-    // more than the protocol / server cap (32): its own count code, even with valid distinct monsters
-    const many = pool.slice(0, VERSUS_CONFRONT.maxBosses + 1).map((r) => ({ enemyKey: r.key }));
+    // over the round's cap (the EVENT's ordinal, user 2026-10-21 after playtest): E1 = 1, so 2 is a count offence
+    assert.equal(m.confrontBossCap(), 1, 'E1 allows ONE boss');
+    const many = pool.slice(0, m.confrontBossCap() + 1).map((r) => ({ enemyKey: r.key }));
     assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: many }).error, ERR.CONFRONT_COUNT);
     assert.equal(m.confrontSubs.has('p_0'), false, 'nothing was stored');
-    // only bosses, no picks at all: legal and free of budget / maxPicks (gate defaults to lower, 'upper' normalises)
-    assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: [{ enemyKey: a.key, gate: 'upper' }, { enemyKey: b.key }] }).ok, true);
+    // only a boss, no picks at all: legal and free of budget / maxPicks (gate defaults to lower, 'upper' normalises)
+    assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: [{ enemyKey: a.key, gate: 'upper' }] }).ok, true);
     const sub = m.confrontSubs.get('p_0');
     assert.deepEqual(sub.picks, [], 'no picks');
-    assert.deepEqual(sub.bosses, [{ enemyKey: a.key, gate: 'upper' }, { enemyKey: b.key, gate: 'lower' }], 'gate 归一化 upper/lower, 缺省 lower');
+    assert.deepEqual(sub.bosses, [{ enemyKey: a.key, gate: 'upper' }], 'gate 归一化 upper/lower');
     assert.equal(m.confrontSpent(sub.picks), 0, 'the boss 格 spends no budget');
     assert.ok(m.confrontSpent(sub.picks) <= m.confrontBudget());
-    // bosses do not count toward maxPicks: 64 picks + 32 bosses is refused for the BUDGET (not the count)
+    // bosses do not count toward maxPicks: 64 picks + the round's bosses is refused for the BUDGET (not the count)
     const h2 = hunt(13);
     const me2 = h2.m.players.get('p_0');
     const cheapest = h2.m.confrontGroups().flatMap((g) => g.rows).sort((x, y) => x.value - y.value)[0];
     const full = Array.from({ length: VERSUS_CONFRONT.maxPicks }, (_, i) => ({ enemyKey: cheapest.key, gate: i % 2 ? 'upper' : 'lower' }));
-    const fullBosses = h2.m.confrontBossPool().slice(0, VERSUS_CONFRONT.maxBosses).map((r) => ({ enemyKey: r.key }));
+    const fullBosses = h2.m.confrontBossPool().slice(0, h2.m.confrontBossCap()).map((r) => ({ enemyKey: r.key }));
     assert.ok(h2.m.confrontSpent(full) > h2.m.confrontBudget(), '64 monsters are over the budget');
     assert.equal(h2.m.submitConfront(me2, { group: 1, position: 'mid', picks: full, bosses: fullBosses }).error, ERR.CONFRONT_BUDGET, 'the count caps stay separate');
     assert.deepEqual(h.logs.error, [], 'no engine errors');
     h2.m.dispose();
+    m.dispose();
+  });
+
+  test('the cap is the EVENT ordinal: 1 / 2 / 3 on E1 / E2 / E3, on the wire as confront.bossCap (user 2026-10-21)', () => {
+    const h = hunt(23);
+    const m = h.m;
+    const r0 = m.round;
+    assert.equal(m.confrontBossCap(), 1, 'E1 = 1 boss');
+    m.round = m.eventRounds[1];
+    assert.equal(m.confrontBossCap(), 2, 'E2 = 2 bosses');
+    m.round = m.eventRounds[2];
+    assert.equal(m.confrontBossCap(), 3, 'E3 = 3 bosses');
+    m.round = r0 + 1;
+    assert.equal(m.confrontBossCap(), 0, 'a round between the events offers none');
+    m.round = r0;
+    // the wire carries the cap beside the pool
+    const wire = m.publicView().confront;
+    assert.equal(wire.bossCap, 1, 'm.public carries the cap');
+    assert.ok(Array.isArray(wire.bossPool), 'and the pool');
+    // an E2 submission may name 2 but not 3 (the over-cap one first: a successful submission ends the stage)
+    const me = m.players.get('p_0');
+    m.round = m.eventRounds[1];
+    const pool = m.confrontBossPool().slice(0, 3).map((r) => ({ enemyKey: r.key }));
+    assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: pool }).error, ERR.CONFRONT_COUNT, 'three are over the E2 cap');
+    assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks: [], bosses: pool.slice(0, 2) }).ok, true, 'two bosses are within it');
+    m.round = r0;
+    assert.deepEqual(h.logs.error, [], 'no engine errors');
     m.dispose();
   });
 
@@ -159,7 +187,7 @@ describe('2V2 事件期 boss 格: 提交校验', () => {
       picks.push({ enemyKey: r.key, gate: 'lower' });
     }
     assert.ok(picks.length > 0, `the budget fills (${row.key})`);
-    const bosses = m.confrontBossPool().slice(0, 2).map((r) => ({ enemyKey: r.key }));
+    const bosses = m.confrontBossPool().slice(0, m.confrontBossCap()).map((r) => ({ enemyKey: r.key }));
     assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks, bosses }).ok, true);
     const sub = m.confrontSubs.get('p_0');
     assert.deepEqual(sub.picks, picks.map((p) => ({ enemyKey: p.enemyKey, gate: 'lower' })), 'the picks ride along');
@@ -202,12 +230,12 @@ describe('2V2 事件期 boss 格: 入场与结算', () => {
       left -= r.value;
       picks.push({ enemyKey: r.key, gate: 'lower' });
     }
-    const [a, b] = m.confrontBossPool();
-    assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks, bosses: [{ enemyKey: a.key }, { enemyKey: b.key, gate: 'upper' }] }).ok, true);
+    const a = m.confrontBossPool()[0];
+    assert.equal(m.submitConfront(me, { group: 1, position: 'mid', picks, bosses: [{ enemyKey: a.key, gate: 'upper' }] }).ok, true);
     const sub = m.confrontSubs.get('p_0');
     const wave = m.applyConfront(plain(20), sub, target);
     const bosses = wave.filter((s) => s.bounty && s.bounty.bank === false);
-    assert.equal(bosses.length, 2, 'both bosses landed');
+    assert.equal(bosses.length, 1, 'the boss landed (E1 cap = 1)');
     const others = wave.filter((s) => !bosses.includes(s));
     const maxOther = Math.max(...others.map((s) => Number(s.time) || 0));
     for (const s of bosses) {
@@ -223,8 +251,8 @@ describe('2V2 事件期 boss 格: 入场与结算', () => {
       assert.equal(s.bounty.total, undefined, 'bosses carry no batch total / index');
       assert.equal(s.bounty.index, undefined);
     }
-    assert.deepEqual(bosses.map((s) => s.enemyKey), [a.key, b.key], 'submission order');
-    assert.deepEqual(bosses.map((s) => s.time), [maxOther + 10, maxOther + 11], '[ASSUMED] max(time) + 10, +1 each');
+    assert.deepEqual(bosses.map((s) => s.enemyKey), [a.key], 'submission order');
+    assert.deepEqual(bosses.map((s) => s.time), [maxOther + 10], '[ASSUMED] max(time) + 10');
     // the normal picks' semantics are untouched: banked 赏金, per-kill plan, batch total
     const placed = wave.filter((s) => s.bounty && s.bounty.bank === true);
     assert.equal(placed.length, sub.picks.length, 'every pick landed');
