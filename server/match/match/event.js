@@ -452,8 +452,15 @@ export class MatchEvent {
     const rec = { target, targetId: targetPs.playerId, card: card.id, key: card.key, kind: card.kind, mag, auto: !!auto };
     ps.eventTargets.push(target);
     this.event.picks.set(ps.playerId, rec);
-    targetPs.eventEntries.push({ card, duration: eventCardDuration(card), mag, from: ps.playerId, round: this.round, target });
+    const entryDuration = eventCardDuration(card);
+    targetPs.eventEntries.push({ card, duration: entryDuration, mag, from: ps.playerId, round: this.round, target });
     targetPs.eventMods = eventModsFor(targetPs.eventEntries, this.round);
+    // A one-round economic entry (空手而归 −2) has no income window left: R's income settled BEFORE the event period,
+    // and R+1 filters it out by duration. Apply the delta once, right here (user 2026-10-21).
+    if (entryDuration === 1 && Number(card.goldPerRound)) {
+      const one = Math.round(Number(card.goldPerRound) * mag);
+      targetPs.funds = Math.max(0, (Number(targetPs.funds) || 0) + one);
+    }
     this.broadcast({
       t: 'm.event', round: this.round, index: this.event.index, playerId: ps.playerId,
       target, targetId: targetPs.playerId, card: card.id, key: card.key, kind: card.kind, mag, auto: !!auto,
@@ -490,7 +497,11 @@ export class MatchEvent {
       const target = this.botEventTarget(ps);
       if (target) this._eventPick(ps, target, { auto: true });
     }
-    for (const [playerId, rec] of ev.picks) this.eventHistory.push({ round: ev.round, index: ev.index, playerId, ...rec, duration: eventCardDuration(rec.card) });
+    for (const [playerId, rec] of ev.picks) {
+      // rec.card is the card's id (a number); resolve it so the published duration reflects the 1-round economy entries
+      const card = eventCardById(rec.card) || eventCardByKey(rec.key) || null;
+      this.eventHistory.push({ round: ev.round, index: ev.index, playerId, ...rec, duration: eventCardDuration(card) });
+    }
     ev.done = true;
     this._eventDoneRound = this.round;
     this.markPublic();

@@ -99,9 +99,10 @@ export class MatchViews {
           return [t, { disabledBonds: [...new Set([...b.drawn, ...b.staticOff])].sort(), drawnDisabledBonds: b.drawn.slice(), bannedChess: b.banned.slice() }];
         })),
       } : {}),
-      // 2V2 对抗期: the 6 equal-value monster groups, the round's per-player budget, who targets whom and each player's
-      // submission. The budget and every card value carry this round's scaling. The view carries the OWN TEAM's entries
-      // only — the opponent's are masked by messaging.js _teamPublicView (the panel shows them as '?').
+      // 2V2 对抗期: 4 of the 7 official 特训敌人 types (2 UP + 2 normal; the final hunt R13 keeps all 7), the round's
+      // per-player budget, who targets whom and each player's submission. The budget and every card value carry this
+      // round's scaling. The view carries the OWN TEAM's entries only — the opponent's are masked by messaging.js
+      // _teamPublicView (the panel shows them as '?').
       ...(this.isVersus && this.confrontActive() && (this.phase === PHASE.CONFRONT || (this.confront && this.confront.size)) ? (() => {
         // while the 对抗期 runs, only what THIS round has collected counts — a previous round's applied submission must
         // not lock the new one (that made the second 对抗期 unselectable); afterwards the applied set feeds the clash.
@@ -127,7 +128,7 @@ export class MatchViews {
             targets: this.confrontTargets ? Object.fromEntries(this.confrontTargets) : {},
             // the official 特训敌人 types: one group per type, its rows priced in this round's currency
             groups: this.confrontGroups().map((g) => ({
-              id: g.id, name: g.name, icon: g.icon, desc: g.desc,
+              id: g.id, name: g.name, icon: g.icon, desc: g.desc, up: !!g.up,
               rows: g.rows.map((r) => ({ key: r.key, name: r.name, value: r.value })),
             })),
             subs,

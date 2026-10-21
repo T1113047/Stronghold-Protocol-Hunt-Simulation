@@ -966,6 +966,11 @@ describe('versus (2V2) match: team model', () => {
     const offered = new Set(groups.flatMap((g) => g.rows.map((r) => r.key)));
     const pool = new Set(confrontPool(m.data.factions));
     for (const k of offered) assert.ok(pool.has(k), `${k} is an official 特训敌人`);
+    // the UP flag must reach the wire — the panel draws the gold border / UP chip from m.public
+    const wire = m.publicView()?.confront?.groups;
+    assert.ok(Array.isArray(wire) && wire.length === 4, 'm.public carries the four type cards');
+    assert.equal(wire.filter((g) => g.up).length, 2, 'the wire carries the two UP flags');
+    assert.ok(wire.every((g) => typeof g.up === 'boolean'), 'each wire group names up');
     // the types are NOT equal-valued any more (that rule is gone with the type grouping): 特异 is the big one
     const totals = groups.map((g) => g.rows.reduce((s, r) => s + r.value, 0));
     assert.ok(Math.max(...totals) / Math.min(...totals) - 1 > 0.2, `type sizes differ: ${totals.join('/')}`);

@@ -89,18 +89,17 @@ export function roundBuffRows(pub, myId) {
  */
 export function RoundBuffs({ pub, myId }) {
   const rows = roundBuffRows(pub, myId);
+  if (!rows.length) return null; // no entries this round → nothing at all (no empty box under the seat)
   return html`<div class="rbuffs" data-testid="round-buffs">
     <div class="rbuffs__title">${t('本期事件词条')}</div>
-    ${rows.length
-      ? rows.map((r, i) => html`<button key=${`${r.kind}:${i}`} type="button"
-          class=${`rbuff rbuff--${r.kind} rbuff--${(r.detail && r.detail.tone) || 'mint'}`}
-          data-testid=${`round-buff-${r.kind}`} title=${`${r.title} · ${t('点击查看词条说明')}`}
-          onClick=${() => openEntryDetail(r.detail)}>
-          <span class="rbuff__icon"><${Icon} name=${(r.detail && r.detail.icon) || 'info'} /></span>
-          <b class="rbuff__name">${r.name}</b>${r.effect ? html` <span class="rbuff__eff">${r.effect}</span>` : null}${r.elite ? html` <span class="rbuff__elite">${r.elite}</span>` : null}
-          ${r.left ? html`<span class="rbuff__left">${t('剩 {n} 回合', { n: r.left })}</span>` : null}
-          <span class="rbuff__more"><${Icon} name="info" /></span>
-        </button>`)
-      : html`<div class="rbuff rbuff--none" data-testid="round-buff-none">${t('暂无')}</div>`}
+    ${rows.map((r, i) => html`<button key=${`${r.kind}:${i}`} type="button"
+        class=${`rbuff rbuff--${r.kind} rbuff--${(r.detail && r.detail.tone) || 'mint'}`}
+        data-testid=${`round-buff-${r.kind}`} title=${`${r.title} · ${t('点击查看词条说明')}`}
+        onClick=${() => openEntryDetail(r.detail)}>
+        <span class="rbuff__icon"><${Icon} name=${(r.detail && r.detail.icon) || 'info'} /></span>
+        <b class="rbuff__name">${r.name}</b>${r.effect ? html` <span class="rbuff__eff">${r.effect}</span>` : null}${r.elite ? html` <span class="rbuff__elite">${r.elite}</span>` : null}
+        ${r.left ? html`<span class="rbuff__left">${t('剩 {n} 回合', { n: r.left })}</span>` : null}
+        <span class="rbuff__more"><${Icon} name="info" /></span>
+      </button>`)}
   </div>`;
 }

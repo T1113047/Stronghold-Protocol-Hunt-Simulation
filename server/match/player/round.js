@@ -23,7 +23,7 @@ export class PlayerRound {
     this.eventRound = r;
     this.eventMods = eventModsFor(this.eventEntries, r);
     // onIncome handlers may rewrite ev.income / ev.pending (e.g. 老鲤 withholds R1–R2 income until R3)
-    // 2V2 事件期: 猎人佣金 / 空手而归 move the round's income (±3 per round, self ×2) before the handlers see it.
+    // 2V2 事件期: 猎人佣金 / 空手而归 move the round's income (+3 / −2 per round, self ×2) before the handlers see it.
     const eventGold = Math.trunc(Number(this.eventMods?.goldPerRound) || 0);
     const ev = { round: r, income: Math.max(0, this.gd.income(r) + eventGold), pending: this.pendingFunds };
     this.pendingFunds = 0;

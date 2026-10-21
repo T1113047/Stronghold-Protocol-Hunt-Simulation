@@ -657,6 +657,46 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     assert.equal(ps.eventEntries.length, 2, 'the records themselves are kept (history, not "currently in force")');
   });
 
+  test('a one-round economic entry lands immediately: 空手而归 −2 (self ×2) is applied once, not as a per-round window', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 77, fake: true }).start();
+    const m = h.m;
+    toEvent(h, m.eventRounds[0]);
+    const p0 = h.ps('p_0');
+    // force the roll: kind = 'down' (15 %) and the first unused card of that kind = 空手而归 (the only one left)
+    for (const c of EVENT_CARDS) if (c.kind === 'down' && c.id !== 23) m.eventUsedAlly.add(c.id);
+    m.rngEvent = () => 0.01;
+    p0.funds = 10;
+    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'self' }), { ok: true });
+    const rec = m.event.picks.get('p_0');
+    assert.equal(rec.key, 'empty_handed', 'the forced roll drew 空手而归');
+    // the round's income was settled BEFORE the event period, so the −4 (self ×2) is applied at pick time
+    assert.equal(p0.funds, 6, '−4 gold (−2 × self ×2) applied once, right now');
+    assert.equal(p0.eventMods.goldPerRound, -4, 'the window still carries it for the battle/refs side');
+    // R+1 must NOT deduct again (duration 1): base income only
+    p0.funds = 0;
+    p0.startRound(m.eventRounds[0] + 1);
+    assert.equal(p0.funds, p0.gd.income(m.eventRounds[0] + 1), 'no second deduction at the next round');
+  });
+
+  test('the published history carries the card-specific duration (经济负面 = 1, not 4)', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 78, fake: true }).start();
+    const m = h.m;
+    toEvent(h, m.eventRounds[0]);
+    for (const c of EVENT_CARDS) if (c.kind === 'down' && c.id !== 23) m.eventUsedAlly.add(c.id);
+    m.rngEvent = () => 0.01;
+    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'self' }), { ok: true });
+    assert.equal(m.event.picks.get('p_0').key, 'empty_handed');
+    // everyone else is picked by the timeout, then the roster hold archives the history
+    h.run(() => m.phase !== PHASE.EVENT || h.ended != null, { maxSteps: 3e6 });
+    const rec = m.eventHistory.find((r) => r.playerId === 'p_0');
+    assert.ok(rec, 'the pick is archived');
+    assert.equal(rec.duration, 1, 'the published duration is the card\'s, not the 4-round default');
+    assert.equal(eventCardDuration(C(rec.key)), 1);
+    const view = m.eventView();
+    const pubRec = view.ally.history.find((r) => r.playerId === 'p_0');
+    assert.equal(pubRec.duration, 1, 'm.public carries it too');
+  });
+
   test('economy entries (每回合金 / 刷新费 / 出售价) expire with the window too', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 53, fake: true }).start();
     const ps = h.ps('p_0');

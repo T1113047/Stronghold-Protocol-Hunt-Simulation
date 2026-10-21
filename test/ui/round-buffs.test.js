@@ -147,8 +147,8 @@ test('the component reuses the 事件期 overlay: no second card table, no new m
   assert.match(game, /<\$\{TeamPanel\}[^\n]*pub=\$\{pub\}[^\n]*myId=\$\{myId\}/, 'game.js already hands pub / myId to TeamPanel');
   // one line, small, truncated; a thin border and the amber / red mark, no layout of its own
   assert.match(css, /\/\* ---- \[EVBUFF\]/);
-  assert.match(css, /\.rbuff \{[^}]*font-size: calc\(\.10 \* var\(--t\)\)[^}]*white-space: nowrap; overflow: hidden; text-overflow: ellipsis/s);
-  assert.match(css, /\.rbuffs \{[^}]*max-width: min\(4\.4rem, 92vw\)[^}]*pointer-events: auto/);
+  assert.match(css, /\.rbuff \{[^}]*font-size: max\(calc\(\.10 \* var\(--t\)\), 10px\)[^}]*white-space: nowrap; overflow: hidden; text-overflow: ellipsis/s);
+  assert.match(css, /\.rbuffs \{[^}]*max-width: min\(2\.5rem, 90vw\)[^}]*pointer-events: auto/);
   assert.match(css, /\.rbuff__left \{/);
 });
 

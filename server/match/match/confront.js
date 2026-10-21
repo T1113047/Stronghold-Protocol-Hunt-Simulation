@@ -316,7 +316,7 @@ export class MatchConfront {
     if (this.confrontHunt()) {
       this._confrontGroups = all.map((g) => ({ ...g, up: false }));
     } else {
-      const draw = this.confrontTypeDraw(all, this.confrontBudget());
+      const draw = this.confrontTypeDraw(all, this.huntDeployBudget());
       this._confrontGroups = draw.ids.map((id) => byId.get(id)).filter(Boolean)
         .map((g) => ({ ...g, up: draw.up.has(g.id) }));
     }
@@ -350,6 +350,16 @@ export class MatchConfront {
    */
   confrontBudget() {
     return Math.round(this.confrontWaveValue() * this.confrontRatio() * this.huntCfg().budgetMul);
+  }
+
+  /**
+   * What ONE seat can spend this round in the current mode — the budget the type-draw's affordability floor must use.
+   * 2V2 spends `confrontBudget()` (×budgetMul = 2, per player); 同盟狩猎 inserts its prey, so a seat only gets
+   * `wave value × share` (coopHuntPlans). Using the 2V2 number for co-op would let an unplayable 4-type draw through.
+   */
+  huntDeployBudget() {
+    if (this.isVersus) return this.confrontBudget();
+    return Math.round(this.confrontWaveValue() * this.confrontRatio());
   }
 
   /** Σ value of a set of picks, at this round's scaling. */
@@ -477,7 +487,7 @@ export class MatchConfront {
     const waveValue = this.confrontWaveValue();
     const groups = this.confrontGroups().filter((g) => g && Array.isArray(g.rows) && g.rows.length);
     const alive = this.alivePlayers().slice().sort((a, b) => a.seat - b.seat);
-    // seeded rotation of the MAIN type: four alive players land on four different types (7 types available)
+    // seeded rotation of the MAIN type: four alive players land on four different types (the drawn 4-type panel)
     const offset = groups.length ? Math.floor(this.rngCoopHunt() * groups.length) % groups.length : 0;
     const used = new Set();
     const plans = new Map();

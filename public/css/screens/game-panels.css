@@ -776,7 +776,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .confgroup.is-sel { border-color: var(--mint-400); }
 .confgroup.is-up { border-color: var(--gold-2); box-shadow: 0 0 .12rem rgba(242, 189, 62, .18); }
 .confgroup.is-up.is-sel { border-color: var(--mint-400); box-shadow: 0 0 0 1px var(--mint-400); }
-.confgroup__up { font-size: calc(.10 * var(--t)); font-weight: 900; letter-spacing: .08em; color: #1a1405; background: var(--gold-2); padding: 0 .05rem; border-radius: .03rem; }
+.confgroup__up { font-size: max(calc(.10 * var(--t)), 10px); font-weight: 900; letter-spacing: .08em; color: #1a1405; background: var(--gold-2); padding: 0 .05rem; border-radius: .03rem; }
 .confgroup:disabled { opacity: .55; cursor: default; }
 .confgroup__head { display: flex; justify-content: space-between; align-items: baseline; gap: .05rem; }
 .confgroup__name { font-size: calc(.18 * var(--t)); }
