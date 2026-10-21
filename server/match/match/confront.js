@@ -17,6 +17,14 @@
 //   deployment (coopHuntPlans), using the same rhythm / budget / bounty tables (huntCfg). The prey is INSERTED into that
 //   player's wave and its kills are banked at 坎诺特.
 //
+//   事件期 boss 格 (user 2026-10-21): on the 事件期 rounds only (match.eventRounds = E1 / E2 / R13 — the R4 / R8 / R13 of a
+//   R4 start) step 2 adds ONE more slot offering the whole 机变悬赏 monster pool (data/choices.json `bountyDrafts`: every
+//   drafted card's enemyKey and its adds[].enemyKey, ~81 monsters, each priced at the highest coin tier its cards give
+//   it). A boss costs NO budget and counts against no maxPicks, one pick per monster per submission (sub.bosses); it is
+//   placed on the TARGET's wave AFTER every other spawn and pays its killer the pool coin DIRECTLY as gold
+//   (`bounty.bank: false` — economy.js addCoins), never the 坎诺特 赏金 account. [ASSUMED] bots / 托管 never use the
+//   slot (botConfront stays deterministic and boss-free).
+//
 // After the 2V2 roster is complete the 悬赏名单 is held for VERSUS_CONFRONT.rosterMs (CONFRONT_ROSTER_MS) before COMBAT.
 //
 // The budget (confrontBudget) = the round's own wave value × the 5→15 % share (50 % on the R13 最终狩猎 round) ×
@@ -109,6 +117,42 @@ const CONFRONT_GROUP_EXTRA = Object.freeze({
   FLY: ['enemy_1040_bombd'],
   DOT: ['enemy_1422_lrsldr', 'enemy_1425_lrcmra'],
 });
+
+/**
+ * The 事件期 boss 格's monster pool and prices (user 2026-10-21): every monster the 机变悬赏 card pool can put on a card —
+ * each card of choices.json `bountyDrafts` (initial / boss / hunter) contributes its `enemyKey` AND its `adds[].enemyKey`
+ * (~81 monsters today). A monster's coin is the HIGHEST tier it ever appears at across ALL the cards (adds included):
+ * eight monsters are priced at several tiers (e.g. 2 / 1 / 3) and pay the top one.
+ * @param {object} choices gd.choices (data/choices.json, the same source server/match/choices.js reads)
+ * @returns {Map<string, number>} enemyKey → its highest coin tier (0 when no card prices it)
+ */
+export function confrontBossCoins(choices) {
+  const cards = Array.isArray(choices && choices.cards && choices.cards.bounty) ? choices.cards.bounty : [];
+  const byId = new Map(cards.map((c) => [c.effectId, c]));
+  const drafts = (choices && choices.bountyDrafts) || {};
+  const pool = new Set();
+  for (const kind of ['initial', 'boss', 'hunter']) {
+    for (const g of (drafts[kind] && drafts[kind].groups) || []) {
+      for (const id of g.cards || []) {
+        const c = byId.get(id);
+        if (!c) continue;
+        if (c.enemyKey) pool.add(c.enemyKey);
+        for (const a of c.adds || []) if (a.enemyKey) pool.add(a.enemyKey);
+      }
+    }
+  }
+  const out = new Map([...pool].map((k) => [k, 0]));
+  const note = (key, coin) => {
+    if (!out.has(key)) return;
+    const n = Math.trunc(Number(coin) || 0);
+    if (n > out.get(key)) out.set(key, n);
+  };
+  for (const c of cards) {
+    note(c.enemyKey, c.coin);
+    for (const a of c.adds || []) note(a.enemyKey, a.coin);
+  }
+  return out;
+}
 
 export class MatchConfront {
   /**
@@ -322,6 +366,35 @@ export class MatchConfront {
     }
     this._confrontSig = sig;
     return this._confrontGroups;
+  }
+
+  /**
+   * The 事件期 boss 格 is open THIS round (user 2026-10-21): the boss slot exists only on the event rounds
+   * (match.eventRounds = E1 / E2 / R13 — the R4 / R8 / R13 of a R4 start), so the rounds in between never offer it and a
+   * `bosses` list on such a round is refused. [ASSUMED] the submission carries the same gate as the panel.
+   */
+  confrontBossOpen() {
+    return this.isVersus && Array.isArray(this.eventRounds) && this.eventRounds.includes(this.round);
+  }
+
+  /**
+   * The boss 格's pool (confrontBossCoins), named through gd.enemy: every 机变悬赏 monster, at its highest coin tier.
+   * Data, not round state — computed once and cached, sorted by key so the panel order is stable.
+   * @returns {Array<{ key: string, name: string, coin: number }>}
+   */
+  confrontBossPool() {
+    if (this._confrontBossPool) return this._confrontBossPool;
+    const coins = confrontBossCoins(this.gd.choices);
+    this._confrontBossPool = [...coins.entries()]
+      .map(([key, coin]) => ({ key, name: (this.gd.enemy(key) && this.gd.enemy(key).name) || key, coin }))
+      .sort((a, b) => String(a.key).localeCompare(String(b.key)));
+    return this._confrontBossPool;
+  }
+
+  /** The coins ONE boss pays its killer in gold when it dies (its pool's highest tier; 0 outside the pool). */
+  confrontBossCoin(enemyKey) {
+    if (!this._confrontBossCoins) this._confrontBossCoins = new Map(this.confrontBossPool().map((r) => [r.key, r.coin]));
+    return this._confrontBossCoins.get(enemyKey) || 0;
   }
 
   /** The round's original wave spawns (every team faces the same synced one). */
@@ -724,7 +797,7 @@ export class MatchConfront {
     this.phase = PHASE.CONFRONT;
     this.confrontStage = 'target';
     this.confrontTargets = new Map(); // attacker playerId → target playerId
-    this.confrontSubs = new Map();    // attacker playerId → { target, group, position, picks, ratio, budget }
+    this.confrontSubs = new Map();    // attacker playerId → { target, group, position, picks, bosses, ratio, budget }
     this.setDeadline(this.soloUntimed ? null : VERSUS_CONFRONT.targetSeconds, () => this.finishConfrontTargets());
     for (const t of this.matchTeamIds()) {
       if (!this._allBots(t)) continue;
@@ -800,15 +873,18 @@ export class MatchConfront {
     if (alive.length && alive.every((p) => this.confrontSubs.has(p.playerId))) this.finishConfront();
   }
 
-  /** `g.confront { group, position, picks }` in step 2: the monsters a player throws at their target. */
-  submitConfront(ps, { group, position, picks }) {
+  /** `g.confront { group, position, picks, bosses }` in step 2: the monsters a player throws at their target. `bosses`
+   *  (the 事件期 boss 格, user 2026-10-21) is optional — an old client never sends it. */
+  submitConfront(ps, { group, position, picks, bosses }) {
     if (this.phase !== PHASE.CONFRONT || this.confrontStage !== 'monster') return fail(ERR.WRONG_PHASE);
     if (!ps.alive) return fail(ERR.ELIMINATED);
     if (this.confrontSubs.has(ps.playerId)) return fail(ERR.ALREADY);
     const arr = Array.isArray(picks) ? picks : [];
+    const bArr = Array.isArray(bosses) ? bosses : [];
     // the count cap first: it is the protocol's own list bound too (shared/constants.js maxPicks mirrors it)
     if (arr.length > VERSUS_CONFRONT.maxPicks) return fail(ERR.CONFRONT_COUNT);
-    const member = this._confrontMember(ps, group, position, arr);
+    if (bArr.length > VERSUS_CONFRONT.maxBosses) return fail(ERR.CONFRONT_COUNT);
+    const member = this._confrontMember(ps, group, position, arr, bArr);
     if (!member) return fail(ERR.BAD_TARGET, 'illegal 对抗期 pick'); // i18n-ignore: 服务端内部 detail（客户端显示的是 ERR.BAD_TARGET 的文案）
     if (member.error) return fail(member.error);
     this.confrontSubs.set(ps.playerId, member.sub);
@@ -823,9 +899,15 @@ export class MatchConfront {
    * decision 2026-10-17: step into one type, spend part of the budget, step into another and add more), so `group` is
    * display-only and only the union is checked. The AUTHORITATIVE cap (the client greys out what does not fit, this
    * refuses it): over the budget ⇒ ERR.CONFRONT_BUDGET, over the count ⇒ ERR.CONFRONT_COUNT.
+   *
+   * `bosses` (the 事件期 boss 格, user 2026-10-21) is checked on its own: every enemyKey must be in the 机变悬赏 pool
+   * (confrontBossPool — and the round must be an event round at all), an enemyKey may appear at most ONCE per submission
+   * ([ASSUMED] error code: a repeat is a count offence ⇒ ERR.CONFRONT_COUNT), and at most VERSUS_CONFRONT.maxBosses of
+   * them. Bosses pay NO budget and count against NO maxPicks — `picks` may even be empty, a boss-only submission is a
+   * legal one.
    * @returns {{ sub: object }|{ error: string }|null} null = malformed (unknown monster / gate / position)
    */
-  _confrontMember(ps, group, position, picks) {
+  _confrontMember(ps, group, position, picks, bosses = []) {
     const list = this.confrontGroups();
     const allowed = new Set(list.flatMap((g) => g.rows.map((r) => r.key)));
     const arr = Array.isArray(picks) ? picks : [];
@@ -838,14 +920,25 @@ export class MatchConfront {
     }
     if (out.length > VERSUS_CONFRONT.maxPicks) return { error: ERR.CONFRONT_COUNT };
     if (this.confrontSpent(out) > this.confrontBudget()) return { error: ERR.CONFRONT_BUDGET };
+    const bArr = Array.isArray(bosses) ? bosses : [];
+    if (bArr.length > VERSUS_CONFRONT.maxBosses) return { error: ERR.CONFRONT_COUNT };
+    // outside the 事件期 rounds the boss 格 does not exist, so the pool is empty and any boss is refused with it
+    const bossAllowed = this.confrontBossOpen() ? new Set(this.confrontBossPool().map((r) => r.key)) : new Set();
+    const outB = [];
+    for (const p of bArr) {
+      if (!p || typeof p.enemyKey !== 'string' || !bossAllowed.has(p.enemyKey)) return null;
+      if (outB.some((x) => x.enemyKey === p.enemyKey)) return { error: ERR.CONFRONT_COUNT };
+      outB.push({ enemyKey: p.enemyKey, gate: p.gate === 'upper' ? 'upper' : 'lower' });
+    }
     const gi = Number.isInteger(group) && group >= 1 && group <= list.length ? group : 1;
-    return { sub: { target: this.confrontTargets.get(ps.playerId) ?? null, group: gi, position: pos, picks: out, total: out.length, ratio: this.confrontRatio(), budget: this.confrontBudget(), seat: ps.seat } };
+    return { sub: { target: this.confrontTargets.get(ps.playerId) ?? null, group: gi, position: pos, picks: out, bosses: outB, total: out.length, ratio: this.confrontRatio(), budget: this.confrontBudget(), seat: ps.seat } };
   }
 
   /** An AI player's submission, and the one a player who never submits gets at the window's end: fill the budget from
    *  its group, most expensive fitting monster first (the client's 自动选择 button walks the group the player chose — the
    *  AI prefers 特异 (the biggest, most "generic" type), then walks the types in order until one can actually afford
-   *  something, since a tight budget can leave a small type with nothing at all). */
+   *  something, since a tight budget can leave a small type with nothing at all). The 事件期 boss 格 stays EMPTY here
+   *  ([ASSUMED], user 2026-10-21: bots / 托管 never pick bosses — the auto-fill keeps its deterministic picks). */
   botConfront(ps) {
     if (this.phase !== PHASE.CONFRONT || this.confrontStage !== 'monster' || this.confrontSubs.has(ps.playerId)) return;
     const groups = this.confrontGroups();
@@ -869,7 +962,7 @@ export class MatchConfront {
         if (p.length) { gi = i; picks = p; break; }
       }
     }
-    this.confrontSubs.set(ps.playerId, { target: this.confrontTargets.get(ps.playerId) ?? null, group: gi + 1, position: 'mid', picks, total: picks.length, ratio: this.confrontRatio(), budget, seat: ps.seat });
+    this.confrontSubs.set(ps.playerId, { target: this.confrontTargets.get(ps.playerId) ?? null, group: gi + 1, position: 'mid', picks, bosses: [], total: picks.length, ratio: this.confrontRatio(), budget, seat: ps.seat });
     this.markPublic();
   }
 
@@ -960,14 +1053,19 @@ export class MatchConfront {
    * Replace a share of a player's original wave with one attacker's monsters:
    *   * originals worth `share × the wave value` are dropped at random (within 2 % of that value);
    *   * the placed monsters are inserted together at the chosen position (25 / 50 / 75 % of the round's monster count),
-   *     each on the route matching its gate and movement.
+   *     each on the route matching its gate and movement;
+   *   * the 事件期 boss 格's bosses (sub.bosses) replace NOTHING and enter after every other spawn (_confrontBossSpawns).
    * @param {object[]} spawns the player's original SpawnSpecs
-   * @param {{ picks: object[], position: string, ratio: number }} sub
+   * @param {{ picks: object[], bosses?: object[], position: string, ratio: number }} sub
    * @param {object} ps the TARGET player
    * @returns {object[]} the modified spawn list
    */
   applyConfront(spawns, sub, ps) {
-    if (!sub || !Array.isArray(sub.picks) || !sub.picks.length || !Array.isArray(spawns) || !spawns.length) return spawns;
+    const bosses = sub && Array.isArray(sub.bosses) ? sub.bosses : [];
+    const picks = sub && Array.isArray(sub.picks) ? sub.picks : [];
+    if (!sub || !Array.isArray(spawns) || !spawns.length || (!picks.length && !bosses.length)) return spawns;
+    // a boss-only placement ([ASSUMED] user 2026-10-21): the free boss 格 replaces nothing — it only appends its bosses
+    if (!picks.length) return this._confrontBossSpawns(spawns.map((s) => ({ ...s, mods: s.mods ? { ...s.mods } : undefined })), sub, ps);
     const scale = this.confrontScale();
     // price the originals EXACTLY like confrontWaveValue prices the wave (confrontValueOf = stats + the graded 特性
     // score at this round's scale), so the value actually dropped / the wave value is the nominal share (5→15 %, 50 %
@@ -1075,7 +1173,37 @@ export class MatchConfront {
         bounty: { coins: (coins[offset + i] || 0) + scent, ownerPlayerId: ps.playerId, total, index: offset + i, bank: true },
       });
     });
-    return kept;
+    return this._confrontBossSpawns(kept, sub, ps);
+  }
+
+  /**
+   * The 事件期 boss 格's bosses on a wave (user 2026-10-21): appended AFTER every spawn the wave holds at this point
+   * ([ASSUMED] start = max(time) + 10, +1 per boss — “只能排在波次最后入场”), each on the route of its gate, `count: 1`,
+   * `countInTotal: false` (a leaked boss costs no 目标生命值, exactly like a placed monster) and `confrontSeat` = the
+   * sender's seat (display only). The bounty pays the KILLER the pool's highest coin tier DIRECTLY as gold —
+   * `bank: false` (economy.js addCoins → pendingFunds), never the 坎诺特 赏金 account, and it carries no batch
+   * total / index (bosses are not part of the placement's bounty batch). A missed boss pays nothing.
+   * @param {object[]} list the spawn list being built (mutated: the bosses are pushed onto it)
+   * @param {{ bosses: object[], seat?: number }} sub
+   * @param {object} ps the TARGET player (ownerPlayerId / bounty owner — the bounty pays whoever kills it)
+   * @returns {object[]} the same list
+   */
+  _confrontBossSpawns(list, sub, ps) {
+    const bosses = Array.isArray(sub.bosses) ? sub.bosses : [];
+    if (!bosses.length) return list;
+    const mods = roundMods(this.confrontScale());
+    const sentBy = Number.isInteger(sub.seat) ? sub.seat : null;
+    let time = list.reduce((n, s) => Math.max(n, Number(s && s.time) || 0), 0) + 10;
+    for (const p of bosses) {
+      list.push({
+        time: time++, enemyKey: p.enemyKey, count: 1, interval: 0,
+        routeIndex: this.confrontRouteFor(p.enemyKey, p.gate),
+        mods: { ...mods }, ownerPlayerId: ps.playerId, confrontSeat: sentBy,
+        countInTotal: false,
+        bounty: { coins: this.confrontBossCoin(p.enemyKey), ownerPlayerId: ps.playerId, bank: false },
+      });
+    }
+    return list;
   }
 
   /** The insertion time of a position: walk the ORIGINAL wave by count to the 25 / 50 / 75 % mark. */

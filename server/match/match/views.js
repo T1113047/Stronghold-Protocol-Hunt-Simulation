@@ -108,9 +108,10 @@ export class MatchViews {
         // not lock the new one (that made the second 对抗期 unselectable); afterwards the applied set feeds the clash.
         const src = this.phase === PHASE.CONFRONT ? (this.confrontSubs || new Map()) : (this.confront || new Map());
         // `total` = the placement's monster count (the 狩猎期 UI shows how many fit and how many of the sent monsters
-        // are down); `coins` is what the placement pays on a full clear (confrontBountyOf).
+        // are down); `coins` is what the placement pays on a full clear (confrontBountyOf). `bosses` is the 事件期 boss
+        // 格's list (empty elsewhere) — its coins are the pool's per-monster tier, shown from `bossPool` below.
         const subs = {};
-        for (const [pid, s] of src) subs[pid] = s ? { group: s.group, position: s.position || null, picks: s.picks || [], total: (s.picks || []).length, target: s.target || null, coins: this.confrontBountyOf(s.picks) } : null;
+        for (const [pid, s] of src) subs[pid] = s ? { group: s.group, position: s.position || null, picks: s.picks || [], bosses: s.bosses || [], total: (s.picks || []).length, target: s.target || null, coins: this.confrontBountyOf(s.picks) } : null;
         return {
           confront: {
             active: this.phase === PHASE.CONFRONT,
@@ -131,6 +132,9 @@ export class MatchViews {
               id: g.id, name: g.name, icon: g.icon, desc: g.desc, up: !!g.up,
               rows: g.rows.map((r) => ({ key: r.key, name: r.name, value: r.value })),
             })),
+            // 事件期 boss 格 (user 2026-10-21): the whole 机变悬赏 monster pool, each at its highest coin tier — only on
+            // the event rounds (match.eventRounds), `null` on every other 对抗期 round (the 5th slot does not exist there)
+            bossPool: this.confrontBossOpen() ? this.confrontBossPool() : null,
             subs,
           },
         };

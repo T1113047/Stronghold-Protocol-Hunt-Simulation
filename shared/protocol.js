@@ -594,7 +594,9 @@ export const C2S = {
   // data-driven, 7 of them today, so the schema only bounds it loosely and the server clamps) and the placed monsters in
   // spawn order ({ enemyKey, gate }). The cap is the round's VALUE budget, not a count: the player may MIX TYPES, so the
   // list can hold monsters from several tabs (the pool is 120) — hence the generous list cap.
-  'g.confront': { group: nullable((v) => isInt(v, 1, 16)), position: (v) => typeof v === 'string' && ['front', 'mid', 'back'].includes(v), picks: (v) => isList(v, 64, (p) => isPlain(p) && isId(p.enemyKey) && (p.gate === undefined || p.gate === 'upper' || p.gate === 'lower')) },
+  // `bosses` is the 事件期 boss 格 (user 2026-10-21): 机变悬赏 monsters thrown at the opponent, one per distinct enemyKey,
+  // entering after every normal spawn. Optional — an old client never sends it (and pays no budget for it).
+  'g.confront': { group: nullable((v) => isInt(v, 1, 16)), position: (v) => typeof v === 'string' && ['front', 'mid', 'back'].includes(v), picks: (v) => isList(v, 64, (p) => isPlain(p) && isId(p.enemyKey) && (p.gate === undefined || p.gate === 'upper' || p.gate === 'lower')), bosses: (v) => isList(v, 32, (p) => isPlain(p) && isId(p.enemyKey) && (p.gate === undefined || p.gate === 'upper' || p.gate === 'lower')), $optional: ['bosses'] },
   // 2V2 对抗期 step 1: the opposing player this seat attacks this round (first come, first served inside the team)
   'g.confrontTarget': { targetPlayerId: isId },
   // 商人「坎诺特」取款 (confront.js withdrawBounty): the gold the player wants out of their 赏金 account during prep.

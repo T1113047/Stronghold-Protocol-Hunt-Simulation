@@ -1839,7 +1839,7 @@ function MatchScreen() {
 
     ${pub?.confront && (pub.confront.active || pub.confront.roster) ? html`<${ConfrontOverlay} pub=${pub} busy=${confBusy}
       onTarget=${async (targetPlayerId) => { setConfBusy(true); try { await actions.confrontTarget(targetPlayerId); } finally { setConfBusy(false); } }}
-      onConfirm=${async (group, position, picks) => { setConfBusy(true); try { await actions.confront(group, position, picks); } finally { setConfBusy(false); } }} />` : null}
+      onConfirm=${async (group, position, picks, bosses) => { setConfBusy(true); try { await actions.confront(group, position, picks, bosses); } finally { setConfBusy(false); } }} />` : null}
 
     ${pub?.confront && !pub.confront.active && !pub.confront.roster ? html`<${ConfrontClash} pub=${pub} />` : null}
 

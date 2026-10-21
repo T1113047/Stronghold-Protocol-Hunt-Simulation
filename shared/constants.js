@@ -165,6 +165,13 @@ const HUNT_RHYTHM = Object.freeze({
 export const VERSUS_CONFRONT = Object.freeze({
   targetSeconds: 10,
   ...HUNT_RHYTHM,
+  /**
+   * The boss 格 (user 2026-10-21): on the 事件期 rounds (match.eventRounds) the 定制 panel adds one more slot offering the
+   * whole 机变悬赏 monster pool (data/choices.json bountyDrafts). A submission may name at most this many bosses — the
+   * same bound the protocol's `g.confront.bosses` list carries (shared/protocol.js `isList(…, 32, …)`). Bosses cost NO
+   * budget and count against NO maxPicks; within one submission an enemyKey may be named only once.
+   */
+  maxBosses: 32,
 });
 
 /**

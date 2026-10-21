@@ -853,6 +853,32 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   .confov__chips, .confov__list { max-height: none; }
 }
 
+/* boss格 + boss 选择页 (ui/confrontOverlay.js BossPanel): the type row's 5th cell, only on the EVENT rounds (R4 / R8 /
+   R13) whose m.public.confront.bossPool exists — nowhere else the cell is rendered at all. Gold, like the UP frame,
+   and its page is the candidates (icon + name + the gold a kill pays): each at most once (a taken one greys out and a
+   tap cancels it), any number in total. No boss spends budget — the budget bar ignores them and the `boss ×N` summary
+   is its own line — and the 特别说明 block carries the kill-pays-gold rule. */
+.confgroup--boss { border-color: rgba(242, 189, 62, .5); background: rgba(242, 189, 62, .06); }
+.confgroup--boss.is-sel { border-color: var(--gold-2); box-shadow: 0 0 0 1px var(--gold-2); }
+.confgroup__name--boss { color: var(--gold-2); letter-spacing: .1em; }
+.confovb { display: flex; flex-direction: column; gap: .08rem; flex: 0 0 auto; min-height: 0; }
+.confov__chips.confovb__chips { min-height: .9rem; }
+.cchip--boss { border-color: rgba(242, 189, 62, .45); }
+.cchip--boss .cchip__val { color: var(--gold-2); font-size: max(calc(.11 * var(--t)), 10px); font-weight: 700; }
+/* a taken candidate is greyed — but stays tappable (it cancels the pick), so never :disabled here */
+.cchip--boss.is-picked { opacity: .45; filter: grayscale(.55); border-color: var(--gold-2); }
+.cchip--boss.is-picked .cchip__count { color: var(--gold-2); }
+.confovb__note { display: flex; align-items: flex-start; gap: .08rem; margin: 0; padding: .08rem .12rem; flex: 0 0 auto;
+  border: 1px solid var(--gold-2); border-left-width: 3px; background: rgba(242, 189, 62, .12); color: #ffe6ad;
+  font-size: max(calc(.15 * var(--t)), 10px); font-weight: 700; line-height: 1.55; }
+.confovb__note .icon { flex: none; width: .22rem; height: .22rem; margin-top: .02rem; color: var(--gold-2); }
+.confovb__tip { margin: 0; font-size: max(calc(.12 * var(--t)), 10px); flex: 0 0 auto; }
+.confovb__sum { margin: .05rem 0 0; padding: .03rem .08rem; flex: 0 0 auto; border-left: 2px solid var(--gold-2);
+  background: rgba(242, 189, 62, .08); font-size: max(calc(.14 * var(--t)), 10px); font-weight: 800; color: var(--gold-2); }
+@media (max-width: 720px) {
+  .confovb__note { font-size: max(calc(.13 * var(--t)), 10px); padding: .06rem .08rem; }
+}
+
 /* 对抗期 step 1: the opponents as '?' frames — team colour + P number only (the client never learns who they are) */
 .confov__targets { display: flex; flex-direction: column; align-items: center; gap: .16rem; padding: .12rem 0 .2rem; }
 .confov__foes { display: flex; gap: .5rem; }
@@ -1034,6 +1060,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   /* landscape phone: the two picking columns keep ≥ 3 rows of chips without pushing the panel past the screen */
   .confov__remain { font-size: calc(.12 * var(--t)); padding: .02rem .08rem; }
   .confov__chips, .confov__list { min-height: 0; max-height: 38vh; }
+  .confov__chips.confovb__chips { min-height: 0; max-height: 30vh; }
+  .confovb__note { font-size: max(calc(.12 * var(--t)), 10px); padding: .05rem .08rem; line-height: 1.45; }
   .confclash__inner { gap: .08rem .18rem; max-height: 92vh; }
   .confclash__row { gap: .1rem; }
   .confclash__side { width: 1rem; height: 1.15rem; }

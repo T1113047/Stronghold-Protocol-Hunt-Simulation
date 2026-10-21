@@ -96,9 +96,16 @@ export const actions = {
   // twice by the same player in one match — the panel greys those out well before the server's ERR.ALREADY)
   eventPick: (target) => act('g.event.pick', { target }, { sfx: 'confirm' }),
   // 2V2 对抗期 (confront.js): step 1 the opponent this seat attacks; step 2 its monsters — one group, one insertion
-  // position (front / mid / back) and the placed monsters, each on a gate ('upper' 上路 / 'lower' 下路).
+  // position (front / mid / back) and the placed monsters, each on a gate ('upper' 上路 / 'lower' 下路). On the event
+  // rounds (R4 / R8 / R13) `bosses` rides along (optional, { enemyKey, gate }, any count, each kind at most once): it is
+  // free of budget and the wave always enters it last — the field is omitted entirely when none is picked.
   confrontTarget: (targetPlayerId) => act('g.confrontTarget', { targetPlayerId }, { sfx: 'confirm' }),
-  confront: (group, position, picks) => act('g.confront', { group, position, picks: (picks || []).map((p) => ({ enemyKey: p.enemyKey, gate: p.gate === 'upper' ? 'upper' : 'lower' })) }, { sfx: 'confirm' }),
+  confront: (group, position, picks, bosses) => {
+    const payload = { group, position, picks: (picks || []).map((p) => ({ enemyKey: p.enemyKey, gate: p.gate === 'upper' ? 'upper' : 'lower' })) };
+    const sent = (bosses || []).map((b) => ({ enemyKey: b.enemyKey, gate: b.gate === 'upper' ? 'upper' : 'lower' }));
+    if (sent.length) payload.bosses = sent;
+    return act('g.confront', payload, { sfx: 'confirm' });
+  },
   // 商人「坎诺特」: withdraw `gold` 金币 against the banked 赏金 (server-authoritative rate / cost / cap)
   merchantWithdraw: (gold) => act('g.confront.withdraw', { gold }, { sfx: 'buy' }),
   ready: (ready) => act('g.ready', { ready }, { sfx: ready ? 'ready' : 'back' }),
