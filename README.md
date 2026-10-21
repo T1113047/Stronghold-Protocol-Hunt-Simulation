@@ -1,6 +1,9 @@
 # 卫戍协议：狩猎模拟 · Stronghold Protocol: Hunt Simulation
 
-**版本 `V0.0.4（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
+**版本 `V0.0.4（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物、事件回合还能从 **boss 格**加送一只机变悬赏 boss，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
+
+> [!NOTE]
+> **V0.0.4 是本作的正式版**：玩法定稿、功能完整，游玩与部署都请以它为基准。此后仅计划再更新**一个特色模式**（另行公告）；之后进入维护期——只跟随上游版本同步（修复 / 兼容 / 安全），不再做玩法改动。
 
 > **非官方、非商业、不含游戏素材。** 本仓库与鹰角网络、Yostar 及其关联方没有任何关系；《明日方舟》相关素材版权归原权利人所有，不适用本项目的 GPL。仅供学习交流与个人非商业使用，详见下方[声明](#声明)与 [NOTICE.md](NOTICE.md)。
 
@@ -80,13 +83,14 @@ English summary: [below](#english).
 
 - **替换比例**：起始回合 **5%**，之后每回合 **+2 个百分点**，上限 **15%**；**R13 最终狩猎固定 50%**（面板会标明）。
 - **每人预算**：本回合波次总价值 × 替换比例 × **2**，每人各算各的。比例同时决定预算与被替换掉的原怪份额。
-- **7 类「特训敌人」**：特异 / 飞行 / 频次 / 元素 / 持续 / 隐匿 / 折射，用官方的中文名与图标。类型只是「口味」，**可以跨类型混搭**，只受**总价值**约束，合计不超预算即可。
-- **价值表**：按属性打分（生命为主，攻击 / 防御 ×2，法抗 ×15，首领加成、每阻挡 60，飞行按 2 阻挡；**远程怪整只 ×1.5**），再加上**特性分档**（1 / 2 / 3 档：纯数值 / 真机制 / 改变战局）；特性部分**恰好占整张价值表的 30%**。
+- **7 类「特训敌人」**：特异 / 飞行 / 频次 / 元素 / 持续 / 隐匿 / 折射，用官方的中文名与图标。类型只是「口味」，**可以跨类型混搭**，只受**总价值**约束，合计不超预算即可。**普通狩猎轮每轮从 7 类中抽 4 类**展示：**2 类 UP**（金色边框 + UP 角标，全房共享、每轮重抽；抽出的 4 类里没有预算内买得起的怪会自动换一类）+ 2 类普通，四类不重复；**最终狩猎 R13 仍展示全部 7 类**，不做 UP 抽取。
+- **价值表**：按属性打分（生命为主，攻击 / 防御 ×2，法抗 ×15，首领加成、每阻挡 60，飞行按 2 阻挡；**远程怪整只 ×1.5**、**频次怪整只 ×1.5**，双修为 ×2.25），再加上**特性分档**（1 / 2 / 3 档：纯数值 / 真机制 / 改变战局）；特性部分**恰好占整张价值表的 30%**。
 - **出怪位置与门**：全部怪一起插在本轮波次的**靠前 / 靠中 / 靠后**（本轮怪物数的 **25% / 50% / 75%**）；每只怪单独选**上路 / 下路**，按它自己的移动方式走对应路线。队列里的怪**默认下路**，点一下换门，长按拖动排序。
 - **只落在你选定的对手身上**：你投放的怪只会出现在**你锁定的那名对手**的下一场作战里，替换掉对方波次里价值对等的一部分原怪（误差在 2% 以内）。
 - **漏过不扣血**：被投放的怪漏进保护目标点**不扣**对方的共享生命池，也**不算**对方的漏怪、不破坏「完美作战」——**只有击杀才有收益**。
 - **看得见来源**：对面投放给你的怪带一圈**淡红描边**，脚下标出 `P<n>` **来源小字**（只作显示，不改归属、不参与扣血计算）。
 - **5 秒名单公示**：狩猎期一结束（双方都锁定、即将开战），会弹出**双方名单**——逐条列出「谁 → 派了什么 → 打谁 → 赏金 +N」，在屏幕上停留 **5 秒**后自动消失。这是除最终攻势之外唯一能看到对手阵容的时刻。
+- **boss 格（事件回合限定）**：R4 / R8 / R13 这三个**事件回合**的类型卡行会多出第 **5 格「boss」**（R13 为 7 类 + boss = 8 格）——候选是**机变悬赏卡池**里所有会出现的怪（约 81 只，按它在机变里的最高档金币标价）。**上限 = 第几次事件**：第 1 次事件（R4）最多 1 个、第 2 次（R8）最多 2 个、第 3 次（R13）最多 3 个；每个候选每轮至多选 1 次，**不占投放预算**。boss 随本轮投放**给对面**，**只能从波次最后入场**；被击杀后**击杀方直接获得金币**（机变口径，**不进坎诺特赏金账本**），漏掉不给、也不扣血、不破坏完美作战。
 
 **操作辅助**：「**沿用上轮**」把上一轮提交过的编队按本轮预算重新装填；「**自动选择**」按价值贪心填满预算、之后仍可手改。
 
@@ -127,7 +131,7 @@ English summary: [below](#english).
 
 每次事件抽**两条**：一条**我方词条**（四选一决定给谁），一条**怪物词条**（独立抽取，与目标无关）。
 
-**我方词条持续 4 回合**：在抽中的回合生效，并在之后 3 个回合继续生效（`picked … picked+3`），到 `picked+4` **自动失效**，属性 / 经济效果都回到基线；历史与公示仍显示全部 3 次选择，只有「当前生效」按这个窗口过滤。怪物词条与强力属性本来就只作用于当回合，不受影响。
+**我方词条持续 4 回合**：在抽中的回合生效，并在之后 3 个回合继续生效（`picked … picked+3`），到 `picked+4` **自动失效**，属性 / 经济效果都回到基线；历史与公示仍显示全部 3 次选择，只有「当前生效」按这个窗口过滤。怪物词条与强力属性本来就只作用于当回合，不受影响。**经济类负面词条只压 1 回合**：空手而归（每回合收入 −2，抽中的**当回合立即结算一次**）与集市换货（卖干员 −1、刷新费减免）只持续 1 回合，不会把经济惩罚拖满 4 回合；P4 下方的词条条每条**实时显示剩余回合**，点击可看完整说明。
 
 **我方词条（24 条，局内不重复）**：每次在**对面 A / 对面 B / 队友 / 自己**里四选一；**同一个目标一局只能用一次**，所以三次事件必然落在三个不同的目标上。选**自己**时幅度 **×2**——吃到增益最爽，吃到减益也最疼。词条分输出 / 生存 / 技力 / 经济·机制四类，既有纯增益、纯减益，也有「攻击换攻速」「生命换攻击」这类**交换型中性**。类型概率随事件次序递进（减益 / 中性 / 增益）：
 
@@ -178,16 +182,17 @@ English summary: [below](#english).
 
 ## 相对原版的价值
 
-上游 0.2.6 是一套很完整的 **1–4 人纯合作**玩法。本作在不动这套底子的前提下，主要给玩家多加了下面几件事：
+上游 0.3.1 是一套很完整的 **1–4 人纯合作**玩法。本作在不动这套底子的前提下，主要给玩家多加了下面几件事：
 
 1. **两种狩猎，不再只有纯合作。** 想和朋友一起打，就开**同盟狩猎**：最多四个人共享生命池，系统按比例往每个人的波次里投放猎物。想互相较劲，就开 **2V2 狩猎模拟**：两队互派猎物、共享生命池、各打各的 Boss。同一套游戏、两种完全不同的社交体验。
 2. **每局都能换 build。** 事件期一局 3 次，每次在「对面 A / 对面 B / 队友 / 自己」里四选一，配 24 条我方词条与 12 条怪物词条。它不是单纯的抽卡运气——**把词条给谁**才是决策：给对面可能养肥对手，给队友是稳，给自己是 ×2 的高方差赌博；2V2 里三次目标还不能重复。
-3. **把击杀收益变成节奏决策。** 赏金不直接进金币，而是存在坎诺特那里，按回合比率折价取钱。早取更贵、晚取更划算，但普通回合最多取 4 金，R15 才 1:1 且不限。你必须在「现在补强」和「再等等」之间做选择，击杀收益不再是无脑通胀。
-4. **信息差与时间胜负。** 对手从开局一直隐藏到 R13，最终攻势起才公开；结算先比两场领袖战的**剩余时间占比（4:5）**，而不是只比谁血多。藏阵容、抢时间、在最终攻势里冒险，都有了意义。
-5. **轻量运维。** 仍然是**单个 Node.js 进程 + WebSocket**，战斗在各玩家浏览器里模拟；一台低功耗小主机就能开服。
-6. **手机与低配友好。** 手机横屏优先，结算页分两栏；界面字号跟随设置里的「文字大小」；可切**简化平面 / 2D 棋盘**、关闭角色模型；核显 / 软件渲染会按 GPU 自动降档，玩家显式选择优先。
+3. **事件回合的 boss 格。** R4 / R8 / R13 的狩猎期多一格「boss」：按「第几次事件」限量（1 / 2 / 3）把机变悬赏池里的 boss 直接送进对面波次的**最后**，不占预算、击杀按机变口径**直接给金币**（不进坎诺特赏金账本）——给对面的波次压力之外，又多了一层「压谁、压多少」的博弈。
+4. **把击杀收益变成节奏决策。** 赏金不直接进金币，而是存在坎诺特那里，按回合比率折价取钱。早取更贵、晚取更划算，但普通回合最多取 4 金，R15 才 1:1 且不限。你必须在「现在补强」和「再等等」之间做选择，击杀收益不再是无脑通胀。
+5. **信息差与时间胜负。** 对手从开局一直隐藏到 R13，最终攻势起才公开；结算先比两场领袖战的**剩余时间占比（4:5）**，而不是只比谁血多。藏阵容、抢时间、在最终攻势里冒险，都有了意义。
+6. **轻量运维。** 仍然是**单个 Node.js 进程 + WebSocket**，战斗在各玩家浏览器里模拟；一台低功耗小主机就能开服。
+7. **手机与低配友好。** 手机横屏优先，结算页分两栏；界面字号跟随设置里的「文字大小」；可切**简化平面 / 2D 棋盘**、关闭角色模型；核显 / 软件渲染会按 GPU 自动降档，玩家显式选择优先。
 
-**上游 0.3.1 带来的内容**：Forge 工坊包导入大幅补齐（主题变量、公告、行为开关、新的盟约 / 装备 / 召唤物 / 驻守与池外官方干员、面板兼容层、特效、皮肤），插件工作台为这些新功能加了图形化模板；设置新增「素材存储」（申请持久保存、清理旧版本素材）与「异形屏适配」；修复余、野鬃、缪尔赛思、瑕光等干员的官方特效和动作，琳琅诗怀雅三技能改为官方的不自动关闭，详见 [CHANGELOG.md](CHANGELOG.md)。
+**上游 0.3.1 带来的内容**：Forge 工坊包导入大幅补齐（主题变量、公告、行为开关、新的盟约 / 装备 / 召唤物 / 驻守与池外官方干员、面板兼容层、特效、皮肤），插件工作台为这些新功能加了图形化模板；设置新增「素材存储」（申请持久保存、清理旧版本素材）与「异形屏适配」；修复余、野鬃、缪尔赛思、瑕光等干员的官方特效和动作，琳琅诗怀雅三技能改为官方的不自动关闭，详见 [CHANGELOG.md](CHANGELOG.md)。**V0.0.4 已合入上游 0.3.2 预览**（master 状态，上游尚未打 tag）：setup / doctor 的资产校验修正与一批 Windows 测试修复，无玩法变化。
 
 ## 功能一览
 
@@ -196,7 +201,9 @@ English summary: [below](#english).
 - **狩猎模拟（2V2）与狩猎期**：两支双人小队、每队共享生命池、按轮给对面派怪、击杀得赏金、5 秒悬赏名单公示；R14 / R15 两人共享战场。
 - **同盟狩猎**：1–4 人合作，系统按比例给每人投放一份猎物，同样有坎诺特、事件期与 5 秒投放公示。
 - **最终狩猎（R13）**：替换比例固定 **50%**，赏金固定 **25**（按击杀比例折算），全场的投放都要在这一轮打出价值。
-- **事件期（狩猎词条）**：一局 3 次、四选一目标、2V2 中目标不可重复；24 条我方词条 + 12 条怪物词条；每次另给 10–25% 的普通怪与赏金怪附加一种强力属性；环境 buff 乘区独立相乘。
+- **类型卡 4 类 UP（V0.0.4）**：普通狩猎轮每轮从 7 类「特训敌人」里抽 **4 类**展示——**2 类 UP**（金色边框 + UP 角标，全房共享、每轮重抽，买不起会自动换类）+ 2 类普通；**最终狩猎 R13 仍展示全部 7 类**。
+- **事件期 boss 格（V0.0.4）**：R4 / R8 / R13 的狩猎期面板多一格「boss」——候选为机变悬赏卡池全部怪（约 81 只，最高档金币标价）；**上限 = 第几次事件**（1 / 2 / 3），每候选每轮至多 1 次、不占预算；给对面、波次最后入场，击杀方直接得金币（不进坎诺特赏金账本），漏掉不给也不扣血。
+- **事件期（狩猎词条）**：一局 3 次、四选一目标、2V2 中目标不可重复；24 条我方词条 + 12 条怪物词条；**经济类负面词条只压 1 回合**（空手而归 −2 当回合立即结算），P4 词条条实时显示剩余回合、点击看详情；每次另给 10–25% 的普通怪与赏金怪附加一种强力属性；环境 buff 乘区独立相乘。
 - **商人「坎诺特」**：赏金不进金币，休整期在金币卡上方的头像处按比率取钱；首取 ceil、之后 floor，每回合 4 金上限、R15 不限。
 - **对面视角**：对手在 R13 最终狩猎之后（R14 最终攻势起）公开；**观战席从第一回合起就能看所有人**。
 - **快速匹配**：房主开放匹配后，其他博士一键加入同难度、未开局、有空座的房间。
@@ -232,8 +239,8 @@ English summary: [below](#english).
 
 [Releases](../../releases/latest) 里有两种包，按自己的网络情况选一种：
 
-- **完整包**：附带全部美术 / 音频素材，体积大（约 800 MB，解压后约 1.16 GB），解压就能玩，不需要再下载任何东西。
-- **精简包** `Hunt-Simulation-v0.0.1-lite.zip`（约 25 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
+- **完整包** `Hunt-Simulation-v0.0.4.zip`：附带全部美术 / 音频素材（736.4 MB，解压后约 1.16 GB），解压就能玩，不需要再下载任何东西。
+- **精简包** `Hunt-Simulation-v0.0.4-lite.zip`（26.6 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
 
 版本 `V0.0.4（0.3.1）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
 
@@ -453,7 +460,7 @@ node tools/perfbench.mjs --cpu 1,4,6 --profile             # 真实战斗的帧�
 
 ## English
 
-An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess tower-defense **mode *Stronghold Protocol: Alliance***, played in the browser. This fork — **Stronghold Protocol: Hunt Simulation** (`V0.0.4`, built on upstream 0.3.1) — keeps the 1–4 player co-op and makes **the hunt** its core gameplay. In a match, you build during the Rest Phase, then a **Hunting Phase** hands out prey: in **2V2 Hunt Simulation** the four seats form two duos (0/1 vs 2/3) that share one HP pool and place monsters into the opposing team's wave; in **Alliance Hunt** (1–4 player co-op) the server instead gives every living player their own share, with pairwise-distinct totals. Prey that leaks costs no target HP and breaks no perfect-clear; only kills pay.
+An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess tower-defense **mode *Stronghold Protocol: Alliance***, played in the browser. This fork — **Stronghold Protocol: Hunt Simulation** (`V0.0.4`, the **official stable release**, built on upstream 0.3.1 plus a 0.3.2 preview) — keeps the 1–4 player co-op and makes **the hunt** its core gameplay. In a match, you build during the Rest Phase, then a **Hunting Phase** hands out prey: in **2V2 Hunt Simulation** the four seats form two duos (0/1 vs 2/3) that share one HP pool and place monsters into the opposing team's wave (normal rounds show 4 of the 7 特训敌人 types — 2 flagged **UP**; the final hunt R13 keeps all 7), and on the three **event rounds** (R4 / R8 / R13) the panel gains a fifth **boss** slot that throws a 机变 bounty boss (at most 1 / 2 / 3 by event) in at the very back of the wave, paying its killer **gold directly**; in **Alliance Hunt** (1–4 player co-op) the server instead gives every living player their own share, with pairwise-distinct totals. Prey that leaks costs no target HP and breaks no perfect-clear; only kills pay. After this release only **one more special mode** is planned; the fork then enters maintenance — upstream syncs only, no further gameplay changes.
 
 - **The hunt loop:** deploy in the Rest Phase → place prey in the Hunting Phase → kill the opponent's monsters for **bounty** → withdraw bounty from the merchant **Cannot** at the round's rate → the **R13 Final Hunt** (50% ratio, up to 25 bounty, scaled by the kill ratio) → the **R14 Final Assault** → the **R15 Hidden Core**. When a Hunting Phase closes, both teams' lists — who placed what at whom, and the bounty — stay on screen for **5 seconds**.
 - **Bounty is not gold.** Placement bounties are banked with Cannot (per player, kept across rounds). Withdrawal is the only way to turn them into gold: 20% through R8, 30% at R9, +5% per round from R10, 100% at R15; cost = gold ÷ rate, the first withdrawal of a round rounds up and later ones down, at most 4 gold per round (unlimited at R15). Official bounty cards still pay gold directly.
@@ -461,7 +468,7 @@ An **unofficial, non-commercial fan remake** of Arknights' seasonal auto-chess t
 - **Endgame by time:** the two duos share a boss battlefield in R14, each team fights its own leader, and the result is decided by the **4:5 time score** (R14 and R15 remaining-time shares) before shared HP. The R15 Hidden Core threshold is **> 600 layers per team** (2V2). Opponents stay hidden through R13 and are revealed from R14; spectators see everyone from round 1.
 - **Also built in:** in-match text chat with **server-side banned-word filtering**, per-match logs on disk (7-day retention), a **server-wide notice banner**, a **damage / healing board** (healing credited to whoever granted it), a **teammate overview** (HP / level / deployed), **operator asset prefetch**, **quick match**, a **text-size setting**, and a **graphics auto-adjust** mode (2D/3D board + a character-model toggle, with GPU-based auto-downgrade).
 - **Plugins (0.3.0+):** the server owner drops a plugin into `plugins/`; the host opens it for the room from the "原版 / 插件 ×N" panel, while cosmetic and UI plugins can also be enabled per player in Settings. Plugins come from the community or from the built-in studio at `/studio/`.
-- **Run:** download the full bundle `…-v<version>.zip` (~800 MB, all the art inside, the Chinese, Japanese, English, Korean and own-language operator voices, the official battlefield scenes and the official battle effects included) from [Releases](../../releases/latest) — or the lite one, `…-v<version>-lite.zip` (~25 MB), which downloads the art (~720 MB) on its first start; the update bundle `…-v<version>-update.zip` holds only the files changed since the earlier releases: stop the server, extract it over an existing install and start again — install Node.js 22 or 24, then double-click `scripts\start-windows.bat` (Windows) or run `./scripts/start.sh` (macOS / Linux) and open <http://localhost:3000>. From source: `git clone https://github.com/T1113047/Stronghold-Protocol-Hunt-Simulation.git`, then `npm install && npm run setup && npm start` (setup downloads ~550 MB of art from public mirrors; the official 3D board and some HUD art come from a local Arknights client — without one the game uses the 2D board and look-alike stand-ins).
+- **Run:** download the full bundle `Hunt-Simulation-v0.0.4.zip` (736.4 MB, all the art inside, the Chinese, Japanese, English, Korean and own-language operator voices, the official battlefield scenes and the official battle effects included) from [Releases](../../releases/latest) — or the lite one, `Hunt-Simulation-v0.0.4-lite.zip` (26.6 MB), which downloads the art (~550 MB) on its first start; already-installed copies update in place through **Settings → Game update** (a lite-package diff that only downloads what changed): stop the server, let it apply, start again — install Node.js 22 or 24, then double-click `scripts\start-windows.bat` (Windows) or run `./scripts/start.sh` (macOS / Linux) and open <http://localhost:3000>. From source: `git clone https://github.com/T1113047/Stronghold-Protocol-Hunt-Simulation.git`, then `npm install && npm run setup && npm start` (setup downloads ~550 MB of art from public mirrors; the official 3D board and some HUD art come from a local Arknights client — without one the game uses the 2D board and look-alike stand-ins).
 - **Languages:** Chinese (the default), English, 日本語, 한국어 and 繁體中文 — switch on the title screen or in Settings. Game texts come from the official clients; the Japanese, Korean and Traditional Chinese interface strings are machine translations (corrections welcome: [docs/I18N.md](docs/I18N.md)).
 - **Play with friends:** create a room and share the 4-letter key or the `?room=KEY` link, or open the room to **quick match** so anyone can join a same-difficulty room in one click. On a LAN, use the address printed at start; otherwise use a virtual-LAN tool, a tunnel or a VPS — see [docs/DEPLOY.md](docs/DEPLOY.md).
 - **Disclaimer:** not affiliated with or endorsed by Hypergryph or Yostar. All Arknights names, art, audio, text and data are © their respective owners and are **not** covered by this project's GPL licence. For study and personal non-commercial use only — no selling, paid distribution, paid servers or monetisation of any kind. Content will be removed on request of the rights holders. Provided "as is", without warranty.
