@@ -2457,7 +2457,7 @@
   "范围": "Scope",
   "多个词条按环境乘区相乘：两个 +20% 是 ×1.44；攻速、技力等固定值先加到面板，不参与乘区。": "Entries multiply in the environment bucket: two +20% entries are ×1.44. Flat ASPD / SP values are added to the panel first and are never scaled by it.",
   "怪物词条只改本回合的敌方波次，不改赏金。": "A monster entry only changes this round's enemy wave; it never changes bounty.",
-  "强力属性在怪物词条之上再乘一次。": "The 强力 attribute multiplies on top of the monster entry.",
+  "强力属性在怪物词条之上再乘一次。": "The Elite attribute multiplies on top of the monster entry.",
   "点击查看词条说明": "Click for details",
   "词条": "Entry",
   "输出": "Output",

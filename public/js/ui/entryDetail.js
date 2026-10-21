@@ -19,16 +19,18 @@ import { EVENT_DURATION_ROUNDS } from '../../../shared/constants.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
-// class → label + icon (the two families share 生存 / 攻击 / 速度 / 数量 / 输出 / 技力 / 经济)
+// class → label + icon (the two families share 生存 / 攻击 / 速度 / 数量 / 输出 / 技力 / 经济). The labels are UI text but
+// travel through t() as variables in entryLook below (the scanner cannot follow that), so each table line carries the
+// documented `// i18n-ignore` (docs/I18N.md): the msgids exist in every pack and entryLook translates them.
 const ALLY_CLASS = {
-  output: ['输出', 'sword'], survival: ['生存', 'shield'], sp: ['技力', 'refresh'], economy: ['经济', 'crown'],
+  output: ['输出', 'sword'], survival: ['生存', 'shield'], sp: ['技力', 'refresh'], economy: ['经济', 'crown'], // i18n-ignore
 };
 const FOE_CLASS = {
-  attack: ['攻击', 'sword'], survival: ['生存', 'shield'], speed: ['速度', 'signal'], count: ['数量', 'users'],
+  attack: ['攻击', 'sword'], survival: ['生存', 'shield'], speed: ['速度', 'signal'], count: ['数量', 'users'], // i18n-ignore
 };
 // kind → label + tone (the badge colour)
-const ALLY_KIND = { up: ['增益', 'mint'], mid: ['交换', 'gold'], down: ['减益', 'red'] };
-const FOE_KIND = { favor: ['有利', 'mint'], mid: ['中性', 'gold'], unfavor: ['不利', 'red'] };
+const ALLY_KIND = { up: ['增益', 'mint'], mid: ['交换', 'gold'], down: ['减益', 'red'] }; // i18n-ignore
+const FOE_KIND = { favor: ['有利', 'mint'], mid: ['中性', 'gold'], unfavor: ['不利', 'red'] }; // i18n-ignore
 
 /**
  * The badge / icon of one entry.
@@ -38,8 +40,8 @@ const FOE_KIND = { favor: ['有利', 'mint'], mid: ['中性', 'gold'], unfavor: 
  */
 export function entryLook(kind, card) {
   const ally = kind === 'ally';
-  const [classLabel, icon] = (ally ? ALLY_CLASS : FOE_CLASS)[card && card.class] || ['词条', 'info'];
-  const [kindLabel, tone] = (ally ? ALLY_KIND : FOE_KIND)[card && card.kind] || ['词条', 'mint'];
+  const [classLabel, icon] = (ally ? ALLY_CLASS : FOE_CLASS)[card && card.class] || ['词条', 'info']; // i18n-ignore
+  const [kindLabel, tone] = (ally ? ALLY_KIND : FOE_KIND)[card && card.kind] || ['词条', 'mint']; // i18n-ignore
   return { icon, tone, kindLabel: t(kindLabel), classLabel: t(classLabel) };
 }
 
