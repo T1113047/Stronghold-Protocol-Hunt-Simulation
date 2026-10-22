@@ -241,6 +241,66 @@ describe('static import graph resolves', () => {
   });
 });
 
+// [TEMP-HTTP2] docs/DEPLOY.md「/sim/ 预热与版本化缓存」: the versioned code prefix /v<hash>/ must be transparent — every
+// relative import of the engine has to resolve, under the mirror, to the same served file it resolves to under /sim/.
+// That is why the version is a prefix of the whole served root and NOT a segment under /sim/: the engine imports out of
+// its own tree (`../../shared/…`, `../../../data.js`), and a `/sim/<hash>/x.js` shape moves those imports one level too
+// deep (measured: the whole module graph fails to load, `Failed to fetch dynamically imported module`).
+describe('the versioned code mirror resolves like the plain paths', () => {
+  const MIRROR = `/v${'a'.repeat(16)}`;
+  const SIM_FILES = walk(path.join(ROOT, 'server', 'sim'), '.js').filter((f) => path.basename(f) !== 'nodeData.js');
+  /** URL path → the file server/http/static.js serves it from (its mounts + the /data.js shim). */
+  function servedFile(urlPath) {
+    const p = urlPath.startsWith(`${MIRROR}/`) ? urlPath.slice(MIRROR.length) : urlPath;
+    if (p === '/data.js') return path.join(ROOT, 'server', 'data.js');
+    if (p.startsWith('/sim/')) return path.join(ROOT, 'server', p);
+    if (p.startsWith('/shared/')) return path.join(ROOT, p);
+    return null;
+  }
+  test('every engine import lands on the same file under /sim/ and under /v<hash>/sim/', () => {
+    let checked = 0;
+    for (const file of SIM_FILES) {
+      const rel = path.relative(path.join(ROOT, 'server', 'sim'), file).split(path.sep).join('/');
+      const plain = new URL(`http://host/sim/${rel}`);
+      const mirror = new URL(`http://host${MIRROR}/sim/${rel}`);
+      for (const { spec } of staticImports(readFileSync(file, 'utf8'))) {
+        if (!/^\.{1,2}\//.test(spec)) continue; // a bare or absolute specifier is the same under both
+        const a = servedFile(new URL(spec, plain).pathname);
+        assert.ok(a && existsSync(a), `server/sim/${rel}: '${spec}' → ${new URL(spec, plain).pathname} is not a served file`);
+        assert.equal(servedFile(new URL(spec, mirror).pathname), a, `server/sim/${rel}: '${spec}' under the mirror`);
+        checked++;
+      }
+    }
+    assert.ok(checked > 100, `checked ${checked} engine imports`);
+  });
+  // A file reached under two different URLs is two module records in one realm — the engine would read one and the
+  // installer (officialBounds), the data shim or the registries the other. The mirror must keep every reference to a
+  // file on one URL (the page's own /shared/ imports live in another realm: a Worker is the only host for a set).
+  // The /data.js shim itself is served under the same prefix and imports './sim/simdata.js' → /v<hash>/sim/simdata.js,
+  // the URL the engine gives its own copy, so the shim's getData() reads the data the engine was installed with.
+  test('one URL per module inside the mirrored engine graph', () => {
+    const urls = new Map(); // served file → Set of the URL paths the engine reaches it by
+    const add = (urlPath) => {
+      const file = servedFile(urlPath);
+      if (!file) return;
+      if (!urls.has(file)) urls.set(file, new Set());
+      urls.get(file).add(urlPath);
+    };
+    // the page-side installer (simLoader.js installSimBounds) imports the bounds module at this absolute URL: the engine
+    // has to reach its own copy by the same one, or the caps it installs are not the caps the engine reads
+    add('/shared/plugins/officialBounds.js');
+    for (const file of SIM_FILES) {
+      const rel = path.relative(path.join(ROOT, 'server', 'sim'), file).split(path.sep).join('/');
+      const base = new URL(`http://host${MIRROR}/sim/${rel}`);
+      for (const { spec } of staticImports(readFileSync(file, 'utf8'))) {
+        if (/^\.{1,2}\//.test(spec)) add(new URL(spec, base).pathname);
+      }
+    }
+    const split = [...urls].filter(([, set]) => set.size > 1).map(([file, set]) => `${path.relative(ROOT, file)}: ${[...set].join(' vs ')}`);
+    assert.deepEqual(split, [], 'a module reached by two URLs would be two module records');
+  });
+});
+
 // ---- unit: store ------------------------------------------------------------------------------------------
 
 const mod = (rel) => import(pathToFileURL(path.join(PUBLIC, 'js', rel)).href);

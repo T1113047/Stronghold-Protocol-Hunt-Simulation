@@ -1,11 +1,26 @@
 // C4 simulation hosts (DESIGN §32.11). The clock belongs to runner.js. Only the vanilla host has a Battle on the page.
+//
+// [TEMP-HTTP2] Temporary patch (see docs/DEPLOY.md「/sim/ 预热与版本化缓存」and 本地改动.md §22): a Worker cold-loads
+// ~300 engine modules, one request each, which does not fit a slow link's first b.start. Until the game is served from a
+// domain with TLS + HTTP/2 (the real fix: all modules over one multiplexed connection), runner.js warms a host before
+// the battle (warmSim), reuses it between rounds (release), and imports the engine from a versioned mirror of the served
+// tree (/v<hash>/{sim,shared}/) the browser may keep; the load budget is 45 s. Remove all of it once the entry is HTTP/2.
 import { loadBrowserSim, checkOperatorTraitRuntime } from './simLoader.js';
 import { unitStatsEntry } from '../../../shared/protocol.js';
 
 /** [ASSUMED] 2 s per RPC, including construction and forceEnd (both can execute plugin hooks). */
 export const WORKER_TIMEOUT_MS = 2000;
-/** [ASSUMED] Trusted engine/module/data cold load can take longer; plugin code runs in a separate 2 s install RPC. */
-export const WORKER_LOAD_TIMEOUT_MS = 15000;
+/**
+ * [ASSUMED] Trusted engine/module/data cold load can take longer; plugin code runs in a separate 2 s install RPC.
+ * A fresh Worker has no module map: it imports every module of server/sim one by one (one request each, ~300 of them),
+ * so this budget covers a whole module graph over the link — at ~350 ms per request over the browser's 6 connections
+ * per origin that is ~17 s already. runner.js therefore warms a host before the battle starts (warmSim) and keeps it
+ * between rounds (release); this budget only bounds the fallback when neither could happen.
+ *
+ * [TEMP-HTTP2] 15 s → 45 s for as long as the entry is plain HTTP/1.1 (6 connections, one RTT per request). Back to a
+ * small budget — the upstream shape, `[ASSUMED]` — once the domain + HTTP/2 migration lands.
+ */
+export const WORKER_LOAD_TIMEOUT_MS = 45000;
 const failure = (code, message) => Object.assign(new Error(message), { code });
 
 export class InPageSimHost {
@@ -60,7 +75,8 @@ export class InPageSimHost {
 
 /** Wire state only: no engine import or engine object, including in the dev introspection hooks. */
 export class WorkerSimHost {
-  constructor({ workerFactory = () => new Worker(new URL('./simWorker.js', import.meta.url), { type: 'module' }),
+  constructor({ base = null,
+    workerFactory = () => new Worker(new URL(base ? `./simWorker.js?base=${encodeURIComponent(base)}` : './simWorker.js', import.meta.url), { type: 'module' }),
     timeoutMs = WORKER_TIMEOUT_MS, loadTimeoutMs = WORKER_LOAD_TIMEOUT_MS, onFailure = () => {}, contentFor = null } = {}) {
     this.contentFor = contentFor;
     this.remote = true;
@@ -74,6 +90,16 @@ export class WorkerSimHost {
     this.events = [];
     this.statsCache = new Map();
     this.statsPending = new Set();
+    /** the content set installed in the worker (one per worker, simWorkerRuntime.js) @type {string|null} */
+    this.cs = null;
+    this.loaded = false;
+    /** the in-flight load() (a prewarm and the first b.start of that content set await the same one) @type {Promise<any>|null} */
+    this.loading = null;
+    /** lease bookkeeping of the runner's warm pool ([TEMP-HTTP2]): `pooled` = this runner made it for reuse, `busy` =
+     *  one battle holds it; `gen` counts releases so a late detail-stats answer of a dropped battle is discarded */
+    this.pooled = false;
+    this.busy = false;
+    this.gen = 0;
     this.battle = {
       snapshot: () => this.packet?.snap,
       drainEvents: () => this.events.splice(0),
@@ -101,14 +127,44 @@ export class WorkerSimHost {
     });
   }
   fail(err) { if (this.stopped) return; this.stop(err); this.onFailure(err); }
+  /**
+   * Install `cs`'s checked content in the worker (the worker imports the engine modules itself, simLoader.js). A host
+   * that already holds that content set — or is loading it right now, the runner's `warmSim` — returns as it is: a
+   * worker takes one content set (simWorkerRuntime.js), so a second one is refused instead of breaking the first.
+   */
   async load(cs, content = null) {
-    content ||= await this.contentFor?.(cs);
-    if (!content || content.cs !== cs || !content.data) throw failure('PLUGIN_WORKER_FAILED', 'no checked content set');
+    if (this.stopped) throw failure('PLUGIN_WORKER_STOPPED', 'simulation worker stopped');
+    // a worker takes one content set (simWorkerRuntime.js): the runner pools one host per content set, so this is only
+    // ever a caller that mixed them up — refuse instead of letting the worker break the set it is already holding
+    if (this.cs !== cs && this.loading) throw failure('PLUGIN_WORKER_FAILED', 'simulation worker already loads another content set');
+    if (this.cs !== cs && this.loaded) throw failure('PLUGIN_WORKER_FAILED', 'simulation worker already holds another content set');
+    if (this.cs === cs && this.loading) return this.loading;
+    if (this.cs === cs && this.loaded) return this;
     this.cs = cs;
-    const traitRuntimeVerified = await checkOperatorTraitRuntime(content.data);
-    const ready = await this.rpc('load', [{ ...content, cs, traitRuntimeVerified }], this.loadTimeoutMs);
-    if (ready.install) await this.rpc('install');
-    return this;
+    const run = (async () => {
+      const set = content || (await this.contentFor?.(cs));
+      if (!set || set.cs !== cs || !set.data) throw failure('PLUGIN_WORKER_FAILED', 'no checked content set');
+      const traitRuntimeVerified = await checkOperatorTraitRuntime(set.data);
+      const ready = await this.rpc('load', [{ ...set, cs, traitRuntimeVerified }], this.loadTimeoutMs);
+      if (ready.install) await this.rpc('install');
+      this.loaded = true;
+      return this;
+    })();
+    this.loading = run;
+    try { return await run; } finally { if (this.loading === run) this.loading = null; }
+  }
+  /**
+   * [TEMP-HTTP2] Drop the battle but keep the worker: its module map (one request per module of server/sim) and its
+   * loaded content stay, so the next round's b.start of the same content set starts at once (runner.js releaseHost).
+   */
+  release() {
+    this.gen++;
+    this.packet = null;
+    this.meter = null;
+    this.spec = null;
+    this.events.length = 0;
+    this.statsCache.clear();
+    this.statsPending.clear();
   }
   accept(packet) {
     this.packet = packet;
@@ -124,8 +180,11 @@ export class WorkerSimHost {
   compactResult() { return this.packet.result; }
   unitStats(id) {
     if (!this.stopped && !this.statsPending.has(id)) {
+      const gen = this.gen;
       this.statsPending.add(id);
-      this.rpc('unitStats', [id]).then(v => this.statsCache.set(id, v), () => {}).finally(() => this.statsPending.delete(id));
+      // a value that arrives after release() belongs to the battle this host no longer holds: drop it
+      this.rpc('unitStats', [id]).then(v => { if (gen === this.gen) this.statsCache.set(id, v); }, () => {})
+        .finally(() => { if (gen === this.gen) this.statsPending.delete(id); });
     }
     return this.statsCache.get(id) || null;
   }

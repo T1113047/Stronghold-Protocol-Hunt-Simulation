@@ -76,6 +76,20 @@
 // loads it again — one at a time), and a b.result names the content the battle was simulated on (`cs`, its
 // simulation's; a vanilla room's sends none, as before).
 //
+// [TEMP-HTTP2] Temporary patch (docs/DEPLOY.md「/sim/ 预热与版本化缓存」, 本地改动.md §22): a gameplay set's Worker
+// imports ~300 engine modules, one request each, which the first b.start of a match cannot afford on a slow link — the
+// field fell to the server and the player watched an empty battlefield (players, 2026-10-22). Three things hold until
+// the game is served from a domain with TLS + HTTP/2 (one multiplexed connection, the real fix):
+//   * warmSim(): the room's content set gets a loaded Worker during the match's prep phases, so the first b.start has
+//     nothing left to import;
+//   * releaseHost()/`release()`: a cleared battle hands its Worker back instead of terminating it — 295 imports are
+//     paid once per page, not once per round;
+//   * simBase(): the engine is imported from /v<16 hex of the content hash>/{sim,shared}/ — a versioned mirror of the
+//     served tree (NOT a segment under /sim/: engine modules import out of /sim/, `../../shared/…`, `../../../data.js`,
+//     so a deeper /sim/<hash>/ path breaks exactly those; static.js carries the long version of this) that the server
+//     may answer `immutable`: one page load fetches the ~300 modules, the next one (and the next Worker) reuses them.
+// A `deps.createHost` test host (test/match/runner.test.js) never enters the pool: every hunk above is behind it.
+//
 // createBattleRunner(deps) builds an instance with injectable net / store / clock / frame scheduler / sim loader
 // (test/match/runner.test.js and test/match/runner-pending.test.js drive it under Node).
 
@@ -83,6 +97,7 @@ import { net as appNet } from '../net.js';
 import { store as appStore } from '../store.js';
 import { contentFor as appContentFor, simContent as appSimContent, contentSet as appContentSet } from '../content.js';
 import { fxForm } from '../../../shared/protocol.js';
+import { csUrlPart } from '../../../shared/plugins/identity.js';
 import { spectateEffects } from './observe.js';
 import { recordError, setBattleSource } from '../diag.js';
 import { loadBrowserSim } from './simLoader.js';
@@ -171,7 +186,7 @@ export function createBattleRunner(deps) {
   const clearIv = deps.clearInterval || ((h) => globalThis.clearInterval(h));
   const doc = deps.doc !== undefined ? deps.doc : (typeof document !== 'undefined' ? document : null);
   // `content` (DESIGN §32.6): `{ cs, data }` of a room's content set → the sim on it; null → the original content
-  const loadSim = deps.loadSim || ((content) => (content ? loadBrowserSim({ data: content.data, cs: content.cs, bounds: content.bounds ?? null, scripts:content.scripts || [], hashInput:content.hashInput, nativeVerified:content.nativeVerified }) : loadBrowserSim()));
+  const loadSim = deps.loadSim || ((content) => (content ? loadBrowserSim({ base: simBase(), data: content.data, cs: content.cs, bounds: content.bounds ?? null, scripts:content.scripts || [], hashInput:content.hashInput, nativeVerified:content.nativeVerified }) : loadBrowserSim({ base: simBase() })));
   const logger = deps.logger || SIM_LOGGER;
   // the content sets (DESIGN §32.6): the room's set the page holds (content.js) and the server's original one
   const contentFor = deps.contentFor || appContentFor;
@@ -179,6 +194,19 @@ export function createBattleRunner(deps) {
   /** the content set the page is downloading now (content.js contentSet: its cs while loading), else null */
   const loadingContent = deps.loadingContent || (() => { const c = appContentSet.get(); return c.status === 'loading' ? c.cs : null; });
   const vanillaCs = deps.vanillaCs || (() => { try { return store?.get?.()?.content?.vanilla ?? null; } catch { return null; } });
+
+  /**
+   * [TEMP-HTTP2] The engine modules' URL: `/sim/` (every request revalidated, files.js) or the versioned mirror
+   * `/v<16 hex>/sim/`, which server/http/static.js answers `immutable` (shared modules under the same prefix too).
+   * The hash is the original content's — its `sim` part hashes every served engine module, the shared modules they
+   * import and /data.js — so it changes exactly when that code does. Engine modules import OUT of /sim/
+   * (`../../shared/…`, `../../../data.js`), which is why the version is a prefix of the whole tree and not a segment
+   * under /sim/. A stale page may name an old hash: the server then sends the current file with `no-cache`, never 404.
+   */
+  function simBase() {
+    const cs = vanillaCs();
+    return typeof cs === 'string' && cs ? `/v${csUrlPart(cs)}/sim/` : '/sim/';
+  }
 
   const listeners = new Map();
   const emit = (type, payload) => {
@@ -276,6 +304,87 @@ export function createBattleRunner(deps) {
     }) : loadSim(null)).catch((err) => { if (simP === p) { simP = null; simCs = null; } throw err; });
     simP = p;
     return p;
+  }
+
+  /**
+   * [TEMP-HTTP2] Remote hosts kept warm per content set (see the header; docs/DEPLOY.md「/sim/ 预热与版本化缓存」): a
+   * Worker imports every engine module of server/sim one by one, so a match pays ~300 requests once per page instead of
+   * once per battle and per round. Only hosts this runner made are pooled — a `deps.createHost` host belongs to its
+   * test and is stopped exactly as before.
+   * @type {Map<string|null, any[]>}
+   */
+  const warmHosts = new Map();
+  const poolFor = (cs) => { let p = warmHosts.get(cs); if (!p) { p = []; warmHosts.set(cs, p); } return p; };
+  /** A host of that content set no battle holds (a prewarming one included: load() hands back its in-flight load). */
+  const freeHost = (cs) => (warmHosts.get(cs) || []).find((h) => !h.stopped && !h.busy) || null;
+
+  /** [TEMP-HTTP2] `sim`'s remote host: a warm one of the same content set, else a new Worker (one takes one set). */
+  function leaseHost(sim, onFailure) {
+    const cs = typeof sim.cs === 'string' && sim.cs ? sim.cs : null;
+    const warm = freeHost(cs);
+    if (warm) { warm.onFailure = onFailure; warm.busy = true; return warm; }
+    const host = new WorkerSimHost({ base: simBase(), timeoutMs: deps.workerTimeoutMs, onFailure });
+    host.pooled = true;
+    host.busy = true;
+    poolFor(cs).push(host);
+    return host;
+  }
+
+  /** [TEMP-HTTP2] Terminate a pooled host and forget it (a failure, another content set, one warm worker is enough). */
+  function dropHost(host) {
+    host.busy = false;
+    const pool = warmHosts.get(host.cs);
+    if (pool) { const i = pool.indexOf(host); if (i >= 0) pool.splice(i, 1); if (!pool.length) warmHosts.delete(host.cs); }
+    host.stop();
+  }
+
+  /**
+   * [TEMP-HTTP2] Give a leased host back: a loaded worker stays for the next battle of its content set (one is enough);
+   * a failed one is dropped; a test's own host is stopped, as it always was. Twice on one host changes nothing
+   * (failWorker drops a failed entry's host first).
+   */
+  function releaseHost(host) {
+    if (!host) return;
+    if (!host.pooled) { host.stop(); return; }
+    if (!host.busy) return;
+    host.busy = false;
+    const pool = warmHosts.get(host.cs);
+    if (host.stopped || !host.loaded || !pool || pool.some((h) => h !== host && !h.stopped && !h.busy)) { dropHost(host); return; }
+    host.release();
+  }
+
+  /** [TEMP-HTTP2] Another content set, or no room content at all: the idle workers of the old one are not worth keeping. */
+  function trimHosts(keep = null) {
+    for (const [cs, pool] of [...warmHosts]) {
+      if (cs === keep) continue;
+      const held = pool.filter((h) => h.busy && !h.stopped);
+      for (const h of pool) if (!h.busy) h.stop();
+      if (held.length) warmHosts.set(cs, held); else warmHosts.delete(cs);
+    }
+  }
+
+  /**
+   * [TEMP-HTTP2] Load a Worker for `cs` before a battle needs it: the match's prep phases pay for the ~300 module
+   * requests, so the round's first b.start has nothing left to import (a load still running is awaited by that b.start,
+   * not repeated). A failure here is not a failure of any battle yet — the first b.start tries again.
+   */
+  function warmSim(cs) {
+    if (deps.createHost || deps.loadSim) return;             // a test's own hosts / a page-side sim
+    if (typeof globalThis.Worker !== 'function') return;     // Node (unit tests, tools): nothing to warm
+    const want = typeof cs === 'string' && cs && cs !== vanillaCs() ? cs : null;
+    if (!want) return;
+    const pool = warmHosts.get(want);
+    if (pool && pool.some((h) => !h.stopped)) return;        // warm, loading, or held by a battle
+    const host = new WorkerSimHost({ base: simBase(), timeoutMs: deps.workerTimeoutMs });
+    host.pooled = true;
+    poolFor(want).push(host);
+    ensureSim(want).then((sim) => {
+      if (!sim.remote) throw new Error('the simulation of a content set runs in a worker');
+      return host.load(sim.cs, sim.content);
+    }).catch((err) => {
+      if (!host.stopped) console.warn('[runner] simulation warmup failed', err?.message || err);
+      dropHost(host);
+    });
   }
 
   /** Counted leaks so far of every normal field simulated here: { [fieldId]: n } (user playtest #3 item 2). */
@@ -623,6 +732,7 @@ export function createBattleRunner(deps) {
     const authority = e.authoritative;
     e.failed = true; e.authoritative = false; e.done = true;
     e.host?.stop();
+    if (e.host?.pooled) dropHost(e.host);            // [TEMP-HTTP2] a failed worker never serves the next battle
     stats.errors++;
     recordError('runner', err, 'plugin worker stopped');
     const text = t('插件卡死，本场由服务器接管');
@@ -697,7 +807,7 @@ export function createBattleRunner(deps) {
       if (entries.size <= MAX_ENTRIES) break;
       if (e === cur || (e.authoritative && !e.resultSent) || e.own || e.delivery === 'pending' || e.delivery === 'undelivered') continue;
       rememberCombat(e);
-      e.host?.stop();
+      releaseHost(e.host);            // [TEMP-HTTP2] a remote host goes back to the pool, an in-page one is dropped
       entries.delete(id);
     }
   }
@@ -792,7 +902,7 @@ export function createBattleRunner(deps) {
       let battle;
       try {
         e.host = deps.createHost ? deps.createHost(sim, err => failWorker(e, err)) : sim.remote
-          ? new WorkerSimHost({ onFailure: err => failWorker(e, err), timeoutMs: deps.workerTimeoutMs })
+          ? leaseHost(sim, err => failWorker(e, err))
           : new InPageSimHost();
         if (e.host.remote) {
           await e.host.load(sim.cs, sim.content);
@@ -842,7 +952,7 @@ export function createBattleRunner(deps) {
     } catch (err) {
       if (e.host?.remote) failWorker(e, err); else throw err;
     } finally {
-      if (entries.get(e.battleId) !== e) e.host?.stop();
+      if (entries.get(e.battleId) !== e) releaseHost(e.host);
       if (pending.get(e.battleId) === e) pending.delete(e.battleId);
       if (loading === e) { loading = null; publishState(); }
     }
@@ -911,14 +1021,16 @@ export function createBattleRunner(deps) {
     loading = null;
     for (const e of entries.values()) {
       // never drop an unreported authoritative result (the round already moved on: the server has its own).
-      // A Worker battle is ended by stopping its host below, not by forceEnd on the page-side stub.
+      // A Worker battle is dropped by releasing its host below, not by forceEnd on the page-side stub.
       if (!e.host?.remote && e.authoritative && !e.resultSent && e.battle && !e.battle.finished) { try { e.battle.forceEnd('forced'); } catch { /* ignore */ } }
       rememberCombat(e);
     }
     // a battle still being prepared too: its preparation finds itself gone and stops (prepare). Snapshot first:
     // host.stop() drops the in-page Battle the meter reads.
     for (const e of pending.values()) rememberCombat(e);
-    for (const e of [...entries.values(), ...pending.values()]) e.host?.stop();
+    // [TEMP-HTTP2] a remote host is handed back (its Worker and its imported modules stay for the next round) instead
+    // of being terminated; an in-page battle is dropped as before
+    for (const e of [...entries.values(), ...pending.values()]) releaseHost(e.host);
     pending.clear();
     entries.clear();
     if (!keepMetrics) combatHistory.clear();
@@ -961,6 +1073,17 @@ export function createBattleRunner(deps) {
       // when it plays one (DESIGN §32.6)
       const roomCs = s && s.room && s.room.content && s.room.content.vanilla === false ? s.room.content.cs : null;
       if (phase && phase !== 'LOBBY' && (!simP || simCs !== (roomCs || null))) ensureSim(roomCs).catch(() => {});
+      // [TEMP-HTTP2] the expensive half of that warm-up: a Worker for the room's content set, loaded while the players
+      // prepare (~300 module requests, once per page); the next b.start of it has no cold load to wait for
+      if (phase && phase !== 'LOBBY') { trimHosts(roomCs || null); warmSim(roomCs); }
+    }));
+  }
+  // [TEMP-HTTP2] the room's content set became ready while the match already sits in a phase that plays (a slow
+  // download, a reconnect — no phase change would come): warm its Worker then
+  if (appContentSet && typeof appContentSet.subscribe === 'function') {
+    offs.push(appContentSet.subscribe(() => {
+      const c = appContentSet.get();
+      if (c && c.status === 'ready' && c.cs) warmSim(c.cs);
     }));
   }
   if (doc && typeof doc.addEventListener === 'function') {
@@ -1083,7 +1206,13 @@ export function createBattleRunner(deps) {
     _frame: frame,
     _pump: pump,
     onStart, onPool, onEnd, clear, ensureSim, redeliver, setPaused,
-    dispose() { clear(); for (const off of offs) { try { off?.(); } catch { /* ignore */ } } },
+    dispose() {
+      clear();
+      // [TEMP-HTTP2] the pooled workers go with the runner (clear() keeps them for the next round)
+      for (const pool of [...warmHosts.values()]) for (const h of pool) h.stop();
+      warmHosts.clear();
+      for (const off of offs) { try { off?.(); } catch { /* ignore */ } }
+    },
   };
 }
 

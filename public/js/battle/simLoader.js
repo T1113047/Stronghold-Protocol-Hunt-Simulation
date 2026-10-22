@@ -80,6 +80,10 @@ export async function loadBrowserSim({ base = '/sim/', dataBase = '/data/', fetc
  * never on a scan of its own tables (a bomb would raise its own cap). `bounds` undefined: the original content.
  * @param {string} base @param {Record<string, any>} raw @param {any} [bounds]
  */
+/** (TEMP-HTTP2 note) The offical-bounds module is imported by the engine's own files through `../../shared/plugins/…`,
+ *  which a module directly under /sim/ resolves to this absolute path even under the versioned mirror — and
+ *  `test/client-static.test.js` ("one URL per module inside the mirrored engine graph") fails if the engine ever
+ *  reaches it by another URL, which is exactly when this would have to follow the mirror. */
 async function installSimBounds(base, raw, bounds) {
   let boundsMod;
   try {

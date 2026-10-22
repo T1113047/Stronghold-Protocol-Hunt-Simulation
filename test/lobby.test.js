@@ -277,6 +277,45 @@ describe('static http server', () => {
     assert.equal(html.headers['cache-control'], 'no-cache');
   });
 
+  // [TEMP-HTTP2] /v<16 hex>/{sim,shared}/… and /v<16 hex>/data.js: the versioned mirror of the served root a Worker
+  // imports the engine from (docs/DEPLOY.md「/sim/ 预热与版本化缓存」). Immutable at the current content hash, the
+  // current file with no-cache at any other; the plain paths stay no-cache.
+  test('/v<hash>/: the versioned code mirror is immutable, a stale hash and the plain paths revalidate', async () => {
+    const plain = await httpReq(srv.port, '/sim/spec.js');
+    assert.equal(plain.status, 200);
+    assert.match(plain.headers['content-type'], /^text\/javascript/);
+    assert.equal(plain.headers['cache-control'], 'no-cache');
+    assert.equal((await httpReq(srv.port, '/shared/x.js')).headers['cache-control'], 'no-cache');
+    assert.equal((await httpReq(srv.port, '/data.js')).headers['cache-control'], 'no-cache');
+    const index = await httpReq(srv.port, '/plugins/index.json');
+    assert.equal(index.status, 200);
+    const vanilla = JSON.parse(index.body.toString()).content?.vanilla;
+    assert.match(vanilla, /^[0-9a-f]{64}$/);
+    const v = `/v${vanilla.slice(0, 16)}`;
+    // the mirror of every module the engine graph reaches, the shim included
+    for (const path of ['/sim/spec.js', '/shared/x.js', '/data.js']) {
+      const r = await httpReq(srv.port, `${v}${path}`);
+      assert.equal(r.status, 200, path);
+      assert.match(r.headers['content-type'], /^text\/javascript/, path);
+      assert.match(r.headers['cache-control'], /immutable/, path);
+    }
+    assert.deepEqual((await httpReq(srv.port, `${v}/sim/spec.js`)).body, plain.body);
+    // engine modules import OUT of /sim/ (../../shared/…, ../../../data.js): the prefix is what keeps those paths whole
+    const nested = await httpReq(srv.port, `${v}/sim/content/support/index.js`);
+    assert.equal(nested.status, 200);
+    assert.match(nested.headers['cache-control'], /immutable/);
+    // a stale prefix (a page from before an update) still gets the current file, revalidated — never a 404
+    const stale = await httpReq(srv.port, `/v${'0'.repeat(16)}/sim/spec.js`);
+    assert.equal(stale.status, 200);
+    assert.equal(stale.headers['cache-control'], 'no-cache');
+    assert.deepEqual(stale.body, plain.body);
+    assert.equal((await httpReq(srv.port, `/v${'0'.repeat(16)}/data.js`)).headers['cache-control'], 'no-cache');
+    // the mount rules still hold inside the prefix
+    assert.equal((await httpReq(srv.port, `${v}/sim/nope.js`)).status, 404);
+    assert.equal((await httpReq(srv.port, `${v}/sim/nodedata.js`)).status, 404, 'the Node-only loader stays private');
+    assert.equal((await httpReq(srv.port, '/vzzz/sim/spec.js')).status, 404, 'not a version prefix');
+  });
+
   test('byte ranges for audio (206 / 416 / If-Range)', async () => {
     const full = await httpReq(srv.port, '/assets/audio/bgm.mp3');
     assert.equal(full.headers['accept-ranges'], 'bytes');

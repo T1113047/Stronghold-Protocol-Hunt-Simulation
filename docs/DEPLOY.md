@@ -272,6 +272,24 @@ server {
 
 **HTTP/2**：客户端由数百个小脚本模块组成（0.2.0 起进入对局时约 340 个），隔着公网时建议让代理以 HTTP/2 提供页面：所有模块走同一条连接，远距离玩家首次进入对局明显更快。Caddy 默认就是 HTTP/2；Nginx 见上面的 `http2`。服务器本身只说 HTTP/1.1，局域网或本机游玩不受影响。HTTP/2 省的是往返等待，不减少字节数。
 
+#### 临时补丁 [TEMP-HTTP2]：/sim/ 预热与版本化缓存
+
+**背景**：引擎代码（`server/sim/`，约 **297 个 .js**）由页面里的 **Worker** 逐个 `import` 进对局。浏览器同源只有 6 条连接，所以一次冷加载 ≈ `295 × RTT ÷ 6`：RTT 300 ms 时约 15 s，350 ms 时约 17 s。写死的加载预算是 15 s，超时即放弃本地演算、请服务器接管 —— 玩家看到的是**进入战斗场上不出怪**（2026-10-22 线上事故，证据见本机 `调查报告-内容集不出怪-2026-10-22.md`，改动记录见本机 `本地改动.md` §22）。上游文档也写着同一件事：约 340 个模块，远程联机应开 HTTP/2（即上面那段）。
+
+**正式方案 = HTTP/2**（§2.4：域名 + 证书，或 Cloudflare 之类的 CDN；浏览器不接受明文 HTTP/2，所以必须有 TLS）。现在这两台服务是**裸 IP + 明文 HTTP**（`:11301` / `:11300`，B 中继 `:3002`），拿不到 HTTP/2，于是临时打了这个补丁。
+
+**补丁内容**（三处，全部带 `[TEMP-HTTP2]` 注释，`git grep TEMP-HTTP2` 可查全）：
+
+1. `public/js/battle/runner.js`：`warmSim()` 在**准备阶段**就把房间内容集的 Worker 建好并加载完（`store` 进入 `PREP` 等阶段，或内容集下载完成时触发）；`releaseHost()` / `WorkerSimHost#release()` 让每回合结束的 Worker **留下来**给下一回合用，而不是终止 —— 297 个模块的导入代价从「每场每回合」变成「每个页面一次」。
+2. `public/js/battle/simHost.js` / `simWorker.js`：Worker 增加 `?base=`（模块的 URL 基址）；加载预算 15 s → **45 s**（`WORKER_LOAD_TIMEOUT_MS`）作为兜底。
+3. `server/http/static.js`：`/v<16 位内容哈希>/{sim,shared}/…` 与 `/v<哈希>/data.js` 这一**版本化镜像**返回 `immutable`（哈希等于当前原版内容哈希时）。引擎自己的相对 import 在镜像下会落到同一批文件上（`test/client-static.test.js` 用「同一文件只能有一个 URL」把这条钉住，包括 `officialBounds` 必须仍是引擎实际读的那份），所以 `simLoader.js` 的 `installSimBounds` 不用改。
+
+**为什么版本号是整棵树的「前缀」而不是 `/sim/<哈希>/`**：引擎模块会**从 `/sim/` 往外 import**（`../../shared/…`、`../../../data.js`、`../../shared/plugins/limits.js`）。把哈希塞在 `/sim/` 下面会让这些相对路径整体多一层，`content/support/index.js` 的 `../../../data.js` 就会变成 `/sim/<哈希>/data.js` → 404 → 整张模块图加载失败（实测复现过）。`/v<哈希>/` 前缀镜像的是**站点根**：`/v<h>/sim/**` ↔ `server/sim/**`、`/v<h>/shared/**` ↔ `shared/**`、`/v<h>/data.js` ↔ 原来的 `/data.js` 垫片，所有相对距离保持不变。
+
+**迁移到域名 + HTTP/2 后**：补丁**可以留着**（预热与复用仍然省流量），但建议按 `git grep TEMP-HTTP2` 逐处回退到上游形状（15 s 预算、`/sim/` 直连、每场新建 Worker），把「慢链路怎么办」这件事重新交回给 HTTP/2 与代理缓存。回退时同时删掉本节与 `docs/design/network.md` 里的对应段落。
+
+**B 中继（盟约服的 nginx 缓存）**：`/v…` 不匹配 `location ~ ^/(js|css|shared|sim)/`，会落到兜底 `location /`（60 s + 重校验）；中继自己的缓存忽略 `Cache-Control`，但响应头照样透传给浏览器，所以浏览器的长期缓存不受影响 —— 不需要为这个补丁改中继配置。`warm-list.txt` 里的 `/sim/*` 仍是原路径，继续有效。
+
 **压缩**：服务器自己压缩脚本、样式、数据和 Spine 的 `.skel` / `.atlas`：浏览器支持 brotli 时用 brotli（0.2.6 起，质量 5，比 gzip 快且更小：实测 `.skel` 小约 27%、游戏数据 JSON 小约 26%、前端库小约 14%、脚本小约 5%），否则用 gzip；图片和音频本来就是压缩格式，原样发送。浏览器只在 HTTPS 页面（以及 `localhost`）上声明支持 brotli，所以通过代理或隧道的 https 地址访问时用 brotli，局域网里的 `http://192.168.x.x:3000` 这类地址用 gzip。代理不需要另开压缩（Caddy 的 `encode`、Nginx 的 `gzip` 遇到已经压缩的响应会跳过）。
 
 **Cloudflare 缓存**（命名隧道或自己的域名经过 Cloudflare 时）：Cloudflare 默认只缓存常见扩展名，`.skel`、`.atlas` 和没有扩展名的音频地址 `/media/…` 都不在其中，每个请求都会回到开服的电脑。在 Cloudflare 控制台的「缓存规则」里加一条：主机名是你的游戏域名、且 URI 路径以 `/assets/`、`/fonts/` 或 `/media/` 开头时「符合缓存条件」，边缘 TTL 选「使用源站的 Cache-Control」。0.2.6 起素材清单里的地址带内容哈希（`/assets/~<哈希>/…`），服务器给这类地址一年的 `immutable`，换了内容的文件会换地址，所以长期缓存是安全的；`/data/`、页面和脚本不要加进规则（它们要随服务器更新）。注意：边缘公开缓存官方素材会增加被投诉的风险，大量媒体文件也要留意 Cloudflare 的服务条款；只给自己人玩时不加这条规则也可以。
@@ -285,7 +303,7 @@ https / wss 说明：页面通过 https 打开时客户端自动连接 `wss://�
 - 只有 **HTTPS** 或 **localhost** 能导入。浏览器只在安全上下文里提供 Service Worker 和可用的 Cache Storage。`http://局域网IP:3000` 可以正常玩游戏，也可以用「下载完整素材」，但不能导入；按钮下面和导入窗口里都会说明原因，而不是报错。
 - 玩家导入的是自己已经有的文件：维护者另外提供的素材包 `Stronghold-Protocol-v<版本>-assets.zip`（见第 7 节，不在 GitHub Releases 里），setup 得到的 `public/assets`，或完整发布包 zip。校验通过的文件存在这台浏览器里，并且按地址分开：换了域名或端口就要重新导入。整套素材包约 3.1 万个文件，桌面版 Chrome 导入约 1–2 分钟；zip 分段读取，不会整个读进内存。
 - 和服务器清单里 SHA-256 一致的文件不再向这台服务器请求。整套美术大约 1 GB（下载的约 720 MB，加本地提取的场景和官方战斗特效）；玩家第一局真正用到的通常约 20–50 MB。导入能省下的，是这些本来会从你的机器发出去的字节。哈希对不上的旧版本文件会被拒绝，仍走下载。
-- 导入不经过服务器，服务器日志里看不到这些文件。Service Worker 只回答带内容哈希的 `/assets/`、`/fonts/`、`/media/`。页面、脚本、`/data/`、`/sim/` 和 `/ws` 仍每次走网络。
+- 导入不经过服务器，服务器日志里看不到这些文件。Service Worker 只回答带内容哈希的 `/assets/`、`/fonts/`、`/media/`。页面、脚本、`/data/`、`/sim/` 和 `/ws` 仍每次走网络（例外：临时补丁 `[TEMP-HTTP2]` 下引擎走 `/v<哈希>/{sim,shared}/`，由浏览器 HTTP 缓存长期保留，与本 Service Worker 无关，见 §2.4）。
 
 ## 3. Docker
 

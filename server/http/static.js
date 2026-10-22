@@ -86,6 +86,21 @@ export function resetData() {}
 `;
 /** Files under server/sim that are never served (Node-only). */
 const SIM_PRIVATE = new Set(['nodedata.js']); // lower-case (compared case-insensitively)
+/**
+ * [TEMP-HTTP2] The versioned code prefix `/v<16 hex>/` (csUrlPart of the vanilla content hash — its `sim` part hashes
+ * every served engine module, the shared modules they import and /data.js). A Worker has no module map: it imports each
+ * engine module with its own request (~300), and `/sim/x.js` is `no-cache`, so every one of them costs a round trip —
+ * on a slow link (6 connections per origin) the graph does not load inside the first battle's budget and the player
+ * watches an empty battlefield (2026-10-22; docs/DEPLOY.md「/sim/ 预热与版本化缓存」, 本地改动.md §22).
+ *
+ * The prefix mirrors the served ROOT rather than adding a segment under /sim/: engine modules import OUT of /sim/
+ * (`../../shared/…`, `../../../data.js`), so `/sim/<hash>/x.js` would move every one of those imports one level too
+ * deep. Under `/v<hash>/` the distances are unchanged — /v<h>/sim/** ↔ server/sim/**, /v<h>/shared/** ↔ shared/**,
+ * /v<h>/data.js ↔ the /data.js shim — and the browser may keep the whole tree `immutable`. A stale hash (a page from
+ * before an update) still gets the current file with `no-cache`, never a 404; the plain paths keep working for an older
+ * page and for the tools. Went away with the domain + HTTP/2 migration.
+ */
+const VER_PREFIX = /^\/v([0-9a-f]{16})(?=\/)/;
 
 // ---------------------------------------------------------------------------------------------------
 // Static file handler
@@ -154,6 +169,15 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
       sendError(req, res, 400, '请求地址无效 · Bad request');
       return;
     }
+    // [TEMP-HTTP2] /v<16 hex>/…: the versioned mirror of the served root (VER_PREFIX above). Stripped here, the mounts
+    // and the /data.js shim below find exactly the paths they always did.
+    let verStamp = null;
+    const ver = VER_PREFIX.exec(decoded);
+    if (ver) {
+      verStamp = ver[1];
+      decoded = decoded.slice(ver[0].length);
+      if (!decoded.startsWith('/')) { sendError(req, res, 404, '页面不存在 · Not found'); return; }
+    }
     // the plugin studio's page is never a static file (server/studio/index.js isStudioPath: any spelling of /studio/)
     if (isStudioPath(decoded)) { sendError(req, res, 404, '页面不存在 · Not found', decoded.length <= 200 ? decoded : ''); return; }
     // /assets/~<hash>/x → /assets/x (the hash decides the cache policy below)
@@ -161,7 +185,9 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
     const urlHash = hashed.hash;
     decoded = hashed.path;
     if (decoded === '/data.js') {
-      const headers = { 'Content-Type': MIME['.js'], 'Cache-Control': 'no-cache', ETag: shimTag, 'Content-Length': shimBody.length };
+      // the shim is part of the code hash: immutable under the current version prefix, revalidated otherwise
+      const shim = verStamp != null && verStamp === csUrlPart(vanillaContent().cs) ? IMMUTABLE_CACHE : 'no-cache';
+      const headers = { 'Content-Type': MIME['.js'], 'Cache-Control': shim, ETag: shimTag, 'Content-Length': shimBody.length };
       if (isNotModified(req, shimTag, new Date(0))) { delete headers['Content-Length']; res.writeHead(304, headers); res.end(); return; }
       res.writeHead(200, headers);
       res.end(req.method === 'HEAD' ? undefined : shimBody);
@@ -280,7 +306,8 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
       if (stat.isDirectory()) {
         if (!decoded.endsWith('/')) {
           // Built from normalized segments (never from the raw path) so "//host" can't become an open redirect.
-          const loc = (mount.prefix + segments.map(encodeURIComponent).join('/') + '/').replace(/\/{2,}/g, '/');
+          const before = (verStamp ? `/v${verStamp}` : '') + mount.prefix;
+          const loc = (before + segments.map(encodeURIComponent).join('/') + '/').replace(/\/{2,}/g, '/');
           res.writeHead(301, { Location: loc + (query ? `?${query}` : ''), 'Cache-Control': 'no-cache', 'Content-Length': 0 });
           res.end();
           return;
@@ -328,7 +355,12 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
       if (real === worker) res.setHeader('Content-Security-Policy', SIM_WORKER_CSP);
     }
     const indexed = mount.name === 'public' && segments.length > 1 && ASSET_INDEX_ROOTS.includes(segments[0]);
-    const opts = indexed ? hashedFileOpts(assetIndex, segments.join('/'), stat, urlHash) : (urlHash ? { cacheControl: 'no-cache' } : {});
+    // [TEMP-HTTP2] the versioned code mirror: immutable at the current content hash, the current file with `no-cache`
+    // at any other (an old page, a URL derived from another file's); the plain paths stay `no-cache`
+    const versioned = verStamp != null && (mount.name === 'sim' || mount.name === 'shared');
+    const opts = indexed ? hashedFileOpts(assetIndex, segments.join('/'), stat, urlHash)
+      : versioned ? { cacheControl: verStamp === csUrlPart(vanillaContent().cs) ? IMMUTABLE_CACHE : 'no-cache' }
+      : (urlHash ? { cacheControl: 'no-cache' } : {});
     await serveFile(req, res, absPath, stat, mount.name, segments, query, gzipCache, log, opts);
   };
 }
