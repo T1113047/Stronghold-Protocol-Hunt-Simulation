@@ -3,7 +3,8 @@
 //   ChatBox          the bottom-left control (above the 交流 row): a text field + send key, and a scrollback of the
 //                    last lines (name: text), expanded by default (click the icon to fold it; the icon then carries an
 //                    unread dot). Enter sends, Escape folds. Rendered by screens/game.js in the corner stack; a
-//                    spectator gets it read-only, an eliminated seat gets it disabled, always with the `lockHint`.
+//                    spectator gets it read-only with the `lockHint`; an eliminated seat may still type (the server
+//                    accepts chat from eliminated-but-online seats — the [CHATLOG] rule, mirrored here).
 //   chatBubblesActive keeps the newest line per sender within `ttl`, so the team panel shows a short bubble beside the
 //                    sender's avatar (same idea as activeBubbles for emotes; the panel reuses the .ebubble--text style).
 //

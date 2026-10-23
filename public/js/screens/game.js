@@ -975,9 +975,11 @@ function MatchScreen() {
     if (e && e.seq > lastEmote.current) { lastEmote.current = e.seq; if (e.playerId !== myId) audio.sfx('emote', { volume: 0.6 }); }
   }, [emotes]);
 
-  // [CHAT] the bottom-left chat box: offline / eliminated / spectating seats read only, with the reason as its hint
-  const chatDisabled = conn.status !== 'online' || spectator || !alive;
-  const chatLockHint = conn.status !== 'online' ? t('连接已断开') : spectator ? t('观战中只能旁观') : !alive ? t('已淘汰') : null;
+  // [CHAT] the bottom-left chat box: offline / spectating seats read only, with the reason as its hint.
+  // An eliminated-but-online seat may still type — the server already accepts its g.chat ([CHATLOG] rule);
+  // dead teammates can keep coordinating, so the client must not lock the input on them.
+  const chatDisabled = conn.status !== 'online' || spectator;
+  const chatLockHint = conn.status !== 'online' ? t('连接已断开') : spectator ? t('观战中只能旁观') : null;
 
   // ---- actions ----------------------------------------------------------------------------------------------
   const buy = useCallback(async (i) => {
