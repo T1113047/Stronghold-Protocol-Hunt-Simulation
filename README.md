@@ -1,6 +1,6 @@
 # 卫戍协议：狩猎模拟 · Stronghold Protocol: Hunt Simulation
 
-**版本 `V0.0.4（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物、事件回合还能从 **boss 格**加送一只机变悬赏 boss，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
+**版本 `V0.0.5（0.3.1）`** · 基于 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) **v0.3.1** 的**非官方 2V2 衍生版**。它保留 1–4 人合作，浏览器即开即玩，并把「狩猎」做成核心玩法：休整期布阵，**狩猎期**给对面（或由系统给你）派猎物、事件回合还能从 **boss 格**加送一只机变悬赏 boss，击杀拿**赏金**，找商人**坎诺特**把赏金按比率换成金币，最后在 **R13 最终狩猎 → R14 最终攻势 → R15 隐秘核心**里决出胜负。
 
 > [!NOTE]
 > **V0.0.4 是本作的正式版**：玩法定稿、功能完整，游玩与部署都请以它为基准。此后仅计划再更新**一个特色模式**（另行公告）；之后进入维护期——只跟随上游版本同步（修复 / 兼容 / 安全），不再做玩法改动。
@@ -8,7 +8,7 @@
 > **非官方、非商业、不含游戏素材。** 本仓库与鹰角网络、Yostar 及其关联方没有任何关系；《明日方舟》相关素材版权归原权利人所有，不适用本项目的 GPL。仅供学习交流与个人非商业使用，详见下方[声明](#声明)与 [NOTICE.md](NOTICE.md)。
 
 ![version](https://img.shields.io/badge/version-0.3.1-2ea44f)
-![fork](https://img.shields.io/badge/fork-V0.0.4（0.3.1）-8957e5)
+![fork](https://img.shields.io/badge/fork-V0.0.5（0.3.1）-8957e5)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-22%20%7C%2024-339933)
 
@@ -239,10 +239,10 @@ English summary: [below](#english).
 
 [Releases](../../releases/latest) 里有两种包，按自己的网络情况选一种：
 
-- **完整包** `Hunt-Simulation-v0.0.4.zip`：附带全部美术 / 音频素材（736.4 MB，解压后约 1.16 GB），解压就能玩，不需要再下载任何东西。
-- **精简包** `Hunt-Simulation-v0.0.4-lite.zip`（26.6 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
+- **完整包** `Hunt-Simulation-v0.0.5.zip`：附带全部美术 / 音频素材（736.4 MB，解压后约 1.16 GB），解压就能玩，不需要再下载任何东西。
+- **精简包** `Hunt-Simulation-v0.0.5-lite.zip`（26.6 MB）：不含素材，第一次启动时自动从公开镜像下载约 550 MB，可中断，再次启动会续传。
 
-版本 `V0.0.4（0.3.1）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
+版本 `V0.0.5（0.3.1）`；解压后按 `scripts/start-windows.bat`（Windows）或 `./scripts/start.sh`（macOS / Linux）启动。
 
 ## 快速开始
 
