@@ -449,10 +449,10 @@ function bountyVersusPair(gd, rng, round, sch) {
     const list = rng.shuffle(picked.filter((c) => bountyTierOf(c) === tier));
     list.forEach((c, i) => (i % 2 ? b : a).push(c));
   }
-  while (a.length > VERSUS_TEAM_CARDS) b.push(a.pop());
-  while (b.length > VERSUS_TEAM_CARDS) a.push(b.pop());
-  while (a.length < VERSUS_TEAM_CARDS && b.length > VERSUS_TEAM_CARDS) a.push(b.pop());
-  while (b.length < VERSUS_TEAM_CARDS && a.length > VERSUS_TEAM_CARDS) b.push(a.pop());
+  while (a.length > VERSUS_TEAM_CARDS) b.push(a.pop()); // loop-cap: VERSUS_TEAM_CARDS (a shrinks to it)
+  while (b.length > VERSUS_TEAM_CARDS) a.push(b.pop()); // loop-cap: VERSUS_TEAM_CARDS (b shrinks to it)
+  while (a.length < VERSUS_TEAM_CARDS && b.length > VERSUS_TEAM_CARDS) a.push(b.pop()); // loop-cap: VERSUS_TEAM_CARDS (moves b onto a)
+  while (b.length < VERSUS_TEAM_CARDS && a.length > VERSUS_TEAM_CARDS) b.push(a.pop()); // loop-cap: VERSUS_TEAM_CARDS (moves a onto b)
   if (a.length !== VERSUS_TEAM_CARDS || b.length !== VERSUS_TEAM_CARDS) return null;
   // the same tier multiset on both sides; a pool too thin for that falls back to 道具补给 rather than an unfair board
   const tierKey = (list) => list.map((c) => bountyTierOf(c)).sort().join(',');
