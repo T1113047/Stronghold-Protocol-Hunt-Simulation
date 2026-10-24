@@ -10,6 +10,7 @@ import { planUnites } from '../unite.js';
 import { FieldRunner, DeadBattle } from '../fields.js';
 import { DELAYS } from './common.js';
 import { previewPlayer } from '../preview.js';
+import { duckSpawnsFor } from './duckSpawns.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
 
 export class MatchCombat {
@@ -67,6 +68,10 @@ export class MatchCombat {
     }
     // 同盟狩猎: the system's prey is INSERTED after the event card / 强力属性, so its bounty stays the plan's own value
     if (this.coopHuntActive()) spawns = this.applyCoopHunt(spawns, ps);
+    // 0.0.5 需求 3 (鸭爵特殊怪): an 事件期 round's normal wave is mixed with exactly 1 duck-family enemy per player
+    // (duckSpawns.js — the 鸭爵 strategy's pool, draw, numbers and carriers, nothing adjusted). Inserted last, like the
+    // prey, so the monster card's count changes, the 对抗期 substitutions and the 狩猎期 placements never touch it.
+    spawns = duckSpawnsFor(this, ps, spawns, { preview });
     const ev = { input, kind: 'normal', round: this.round, spawns, ...(preview ? { preview: true } : {}) };
     // Preview construction failures go to the rehearsal's discard path, never Match.dispatch's live error sink.
     if (preview) this.dispatcher.dispatch(ps, 'onBattleStart', ev);

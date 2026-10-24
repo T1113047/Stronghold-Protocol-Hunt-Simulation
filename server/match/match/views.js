@@ -10,6 +10,7 @@ import { boardOrder, pieceDir } from '../board.js';
 import { bondList, offBondCounts } from '../bondsMeta.js';
 import { cardView } from '../choices.js';
 import { bountySpawns, previewOf } from '../waves.js';
+import { duckSpawnsFor } from './duckSpawns.js';
 import { timelineAt } from '../fields.js';
 import { bossFieldPlacement } from '../finalAssault.js';
 import { battleProgress } from '../../sim/spec.js';
@@ -414,8 +415,11 @@ export class MatchViews {
     const bounty = bountySpawns(this.gd, this.round, this.wave, ps.bounties, ps.playerId, { solo: this.isSolo });
     // 2V2 事件期: the round's monster card + 强力属性 subset (the preview's counts/flags must match the battle)
     // 同盟狩猎: the system's prey is appended last, exactly as _normalOpts inserts it
+    // 事件期 rounds: the 鸭爵 special enemy last, exactly as _normalOpts inserts it (preview:true — a clone of the
+    // duck stream, so the HUD never moves the battle's real draw)
     let list = this.foeWaveSpawns([...this.wave.spawns, ...bounty]);
     if (this.coopHuntActive()) list = this.applyCoopHunt(list, ps);
+    list = duckSpawnsFor(this, ps, list, { preview: true });
     return previewOf(list);
   }
 
