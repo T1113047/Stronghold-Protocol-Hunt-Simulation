@@ -295,7 +295,7 @@ describe('同盟狩猎: 赏金 → 坎诺特 bank → 取钱 (never gold)', () =
 });
 
 describe('同盟狩猎: the 事件期 has only self / mate', () => {
-  test('targets, availability and validation exclude the opponents; both targets stay usable for E3', () => {
+  test('targets, availability and validation exclude the opponents; both targets stay usable every event (0.0.5)', () => {
     const h = coop({ seed: 3 }).start();
     h.autoHumans();
     const m = h.m;
@@ -311,9 +311,11 @@ describe('同盟狩猎: the 事件期 has only self / mate', () => {
     assert.equal(m.pickEvent(ps, 'oppA').error, ERR.BAD_TARGET);
     assert.equal(m.pickEvent(ps, 'oppB').error, ERR.BAD_TARGET);
     assert.deepEqual(m.pickEvent(ps, 'self'), { ok: true });
-    // three events / two targets: unlike 2V2, the no-repeat rule cannot hold — both stay offered for E3
+    // 0.0.5: the one-target-per-match limit is gone everywhere — a used target stays offered and may repeat
     ps.eventTargets.push('mate');
     assert.deepEqual(m.eventAvailableTargets(ps), ['self', 'mate']);
+    // a co-op bot has no 对面 side at all: botEventTarget falls back to 自己
+    assert.equal(m.botEventTarget(ps), 'self');
     // the monster channel still runs (the 2V2 entries / 强力属性 apply to the co-op wave)
     assert.ok(m.foeEvent && m.foeEvent.card, 'a monster entry is drawn for the event');
     assert.ok(m.foeWaveSpawns([{ enemyKey: 'enemy_1007_slime', count: 2, mods: {} }]).length > 0);

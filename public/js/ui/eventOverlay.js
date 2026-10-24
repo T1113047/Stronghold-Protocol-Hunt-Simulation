@@ -1,10 +1,13 @@
 // 事件期 overlay (2V2, PHASE.EVENT) — three periods per match (E1 = contestStartRound, E2 = E1 + 4, E3 = R13 最终狩猎,
-// server/match/match/event.js). Every period draws TWO entries: the ally entry each player gives to ONE of four targets
-// (自己 / 队友 / 对面 A / 对面 B, never the same target twice in one match; keeping it doubles the magnitudes), and the
-// monster entry, which is drawn once for the whole round and shown BEFORE anyone picks (its share / 强力属性 included).
-// The panel is read-only over m.public.event: a target tap sends g.event.pick { target } and the next m.public answers.
+// server/match/match/event.js). Every period each alive player picks ONE of four targets (自己 / 队友 / 对面 A / 对面 B;
+// a target may repeat across periods and pickers) and each selection deals the TARGET one pack of three entries
+// (0.0.5 发包规则): 对面包 on an 对面 pick (1 减益 + 2 中性), 我方包 on 自己 / 队友 (1 增益 + 2 中性); a player chosen 0
+// times gets one 默认包 (3 中性). The monster entry is drawn once for the whole round and shown BEFORE anyone picks (its
+// share / 强力属性 included). The panel is read-only over m.public.event: a target tap sends g.event.pick { target } and
+// the next m.public answers.
 // The entry names are the server's Chinese msgids (EVENT_CARDS / EVENT_FOE_CARDS in shared/constants.js); the effect
-// lines are rebuilt from those same constants (signs and magnitudes, self ×EVENT_SELF_MUL).
+// lines are rebuilt from those same constants (signs and magnitudes at their base values — no multiplier any more) and
+// every line names WHOSE units it touches: 「X 的干员」/「X 的敌人」/「双方战场的敌人」 (0.0.5 需求 2).
 import { html, Icon, MicroLabel, Countdown } from '../ui/components.js';
 import { useStore } from '../store.js';
 import { RosterPanel } from './rosterPanel.js';
@@ -25,6 +28,12 @@ const TARGETS = [
   { key: 'self', label: N_('自己'), testid: 'event-target-self' },
 ];
 const TARGET_LABEL = Object.fromEntries(TARGETS.map((x) => [x.key, x.label]));
+
+// The three pack kinds of the 发包规则 (EVENT_PACK_KINDS) and their 归属 labels (0.0.5 需求 2: the 词条说明 popup
+// says which pack an entry came from).
+export const PACK_LABEL = {
+  own: N_('我方包'), opp: N_('对面包'), default: N_('默认包'), // i18n-ignore
+};
 
 // Entry names: the server sends `key` (and the numeric id), the msgid is the Chinese name of the entry. Shared with
 // ui/roundBuffs.js (the team panel's one-line "this round's entries" strip), so the two views can never show
@@ -64,143 +73,138 @@ export function eventFoeCard(foe) {
 }
 
 /**
- * Who received a recorded pick: the target map's playerId for that picker / key, else the record's own `targetId`.
- * Null when the record carries no `target` (an old record from before the server sent it): the caller skips it.
+ * Who received a recorded entry: the target map's playerId for that picker / key, else the record's own `targetId`.
+ * A 默认包 row has no picker / target at all (0.0.5): its receiver IS the `targetId`. Null when the record carries
+ * neither (an old record from before the server sent `target`): the caller skips it.
  * Shared with ui/roundBuffs.js (the 本回合词条 strip), so "who got it" can never be resolved two different ways.
  * @param {any} rec an `ally.history` row
  * @param {Record<string, Record<string, string|null>>} [targets] `m.public.event.ally.targets`
  * @returns {string|null}
  */
 export function eventReceiver(rec, targets = {}) {
-  if (!rec || typeof rec.target !== 'string' || !rec.target) return null;
+  if (!rec) return null;
+  if (rec.packKind === 'default') return typeof rec.targetId === 'string' && rec.targetId ? rec.targetId : null;
+  if (typeof rec.target !== 'string' || !rec.target) return null;
   const map = targets && targets[rec.playerId];
   const viaMap = map && typeof map === 'object' ? map[rec.target] : null;
   if (typeof viaMap === 'string' && viaMap) return viaMap;
   return typeof rec.targetId === 'string' && rec.targetId ? rec.targetId : null;
 }
 
-/**
- * The 词条公示 rows: every pick of THIS period (ally.history rows with the current index), "who gave「X」to whom" and the
- * entry's effect at its own magnitude. The receiver is resolved through eventReceiver (the target map first, the record's
- * own targetId as the fallback). Rows whose card is unknown are skipped — never guessed.
- * @returns {Array<{ key: string, body: any }>}
- */
-export function eventRosterRows(pub, ally, index) {
-  const players = Array.isArray(pub && pub.players) ? pub.players : [];
-  const byId = new Map(players.map((p) => [p.playerId, p]));
-  const targets = (ally && ally.targets) || {};
-  const history = (ally && Array.isArray(ally.history) ? ally.history : [])
-    .filter((r) => r && Number(r.index) === Number(index));
-  const out = [];
-  for (const rec of history) {
-    const card = eventAllyCard(rec);
-    if (!card) continue;
-    const picker = byId.get(rec.playerId) || null;
-    const rid = eventReceiver(rec, targets);
-    const to = rid ? byId.get(rid) || null : null;
-    const name = t(ALLY_NAMES[card.key] || card.key);
-    const effect = allyEffect(card, Number(rec.mag) || 1);
-    out.push({
-      key: `event:${rec.playerId}`,
-      body: html`<span class="rospov__give">
-        <b class="rospov__p num">${pNo(picker)}</b><span class="rospov__name">${(picker && picker.name) || '?'}</span>
-        <span class="rospov__verb">${t('把「{card}」给了', { card: name })}</span>
-        <b class="rospov__p num">${pNo(to)}</b><span class="rospov__name">${(to && to.name) || '?'}</span>
-        ${effect ? html`<span class="rospov__eff">${effect}</span>` : null}
-      </span>`,
-    });
-  }
-  return out;
-}
-
 /** P1 / P2 … of a player row (the seat number). */
 const pNo = (p) => (p && Number.isInteger(p.seat) ? `P${p.seat + 1}` : '');
+
+/** The display name of a player row ("P1 A"), for 来自 {name}. */
+const pLabel = (p) => [pNo(p), (p && p.name) || '?'].filter(Boolean).join(' ');
 
 /** Two decimals at most, trailing zeros dropped ('0.85', '1.2', '36'). */
 const num = (v) => String(Math.round(Number(v) * 100) / 100);
 /** A signed number for the effect lines ('+20', '-9', '+0.3'). */
 const signed = (v) => (Number(v) > 0 ? `+${num(v)}` : num(v));
-/** A ratio as a signed percentage ('+20' / '-9'); `mag` is the target's magnitude (self = EVENT_SELF_MUL). */
-const pct = (ratio, mag = 1) => signed(Number(ratio) * mag * 100);
-/** `base` after the target's magnitude — the same `1 + (m − 1) × mag` the server applies (event.js magMul). */
-const scaled = (base, mag = 1) => num(1 + (Number(base) - 1) * mag);
+/** A ratio as a signed percentage ('+20' / '-9'). */
+const pct = (ratio) => signed(Number(ratio) * 100);
 
-/** The effect of one ally entry at `mag` (1, or EVENT_SELF_MUL for 自己), built from the constants. */
-export function allyEffect(card, mag = 1) {
+/** The card fields that act on the target's OPERATORS (so 「X 的干员」is the subject). */
+const OPERATOR_FIELDS = [
+  'atkPct', 'aspd', 'defIgnorePct', 'hpPct', 'regenPct', 'defPct', 'dmgTaken', 'moveMul',
+  'spRecoveryMul', 'spRecoveryFlat', 'spCostFlat',
+];
+
+/** The subject of one ally entry's effects (需求 2 术语): 「X 的干员」/ 「X 的敌人」 / 「X」 (X = the receiver's label). */
+export function allySubject(card, who = t('目标玩家')) {
+  if (card && card.enemySpeed) return t('{who}的敌人', { who });
+  if (OPERATOR_FIELDS.some((k) => card && card[k])) return t('{who}的干员', { who });
+  return who;
+}
+
+/**
+ * The effect of one ally entry on `who`'s side (需求 2: every line names its subject — 「X 的干员」攻击力 +20%,
+ * 「X 的敌人」移速 +22%, economy lines name the player). Values are the card's own base numbers (no multiplier since
+ * 0.0.5); `mag` keeps the historical signature and only scales when a caller passes one.
+ */
+export function allyEffect(card, who = t('目标玩家'), mag = 1) {
   if (!card) return '';
   const out = [];
-  if (card.atkPct) out.push(t('攻击力 {v}%', { v: pct(card.atkPct, mag) }));
-  if (card.aspd) out.push(t('攻速 {v}', { v: signed(card.aspd * mag) }));
-  if (card.defIgnorePct) out.push(t('无视防御 {v}%', { v: pct(card.defIgnorePct, mag) }));
-  if (card.hpPct) out.push(t('生命值 {v}%', { v: pct(card.hpPct, mag) }));
-  if (card.regenPct) out.push(t('每秒回复 {v}%', { v: pct(card.regenPct, mag) }));
-  if (card.defPct) out.push(t('防御力 {v}%', { v: pct(card.defPct, mag) }));
-  if (card.dmgTaken) out.push(t('受到的伤害 {v}%', { v: pct(card.dmgTaken, mag) }));
-  if (card.moveMul) out.push(t('移动速度 ×{v}', { v: scaled(card.moveMul, mag) }));
-  if (card.enemySpeed) out.push(t('敌人移动速度 {v}%', { v: pct(card.enemySpeed, mag) }));
-  if (card.spRecoveryMul) out.push(t('技力回复 ×{v}', { v: scaled(card.spRecoveryMul, mag) }));
-  if (card.spRecoveryFlat) out.push(t('每秒技力 {v}', { v: signed(card.spRecoveryFlat * mag) }));
-  if (card.spCostFlat) out.push(t('技力消耗 {v}', { v: signed(card.spCostFlat * mag) }));
-  if (card.goldPerRound) out.push(t('每回合金币 {v}', { v: signed(card.goldPerRound * mag) }));
-  if (card.bountyGold) out.push(t('击杀投放怪的赏金 {v}', { v: signed(card.bountyGold * mag) }));
-  if (card.deploy) out.push(t('上场人数 {v}', { v: signed(card.deploy * mag) }));
+  if (card.atkPct) out.push(t('{who}的干员攻击力 {v}%', { who, v: pct(card.atkPct * mag) }));
+  if (card.aspd) out.push(t('{who}的干员攻速 {v}', { who, v: signed(card.aspd * mag) }));
+  if (card.defIgnorePct) out.push(t('{who}的干员无视防御 {v}%', { who, v: pct(card.defIgnorePct * mag) }));
+  if (card.hpPct) out.push(t('{who}的干员生命值 {v}%', { who, v: pct(card.hpPct * mag) }));
+  if (card.regenPct) out.push(t('{who}的干员每秒回复 {v}%', { who, v: pct(card.regenPct * mag) }));
+  if (card.defPct) out.push(t('{who}的干员防御力 {v}%', { who, v: pct(card.defPct * mag) }));
+  if (card.dmgTaken) out.push(t('{who}的干员受到的伤害 {v}%', { who, v: pct(card.dmgTaken * mag) }));
+  if (card.moveMul) out.push(t('{who}的干员移动速度 ×{v}', { who, v: num(1 + (card.moveMul - 1) * mag) }));
+  if (card.enemySpeed) out.push(t('{who}的敌人移动速度 {v}%', { who, v: pct(card.enemySpeed * mag) }));
+  if (card.spRecoveryMul) out.push(t('{who}的干员技力回复 ×{v}', { who, v: num(1 + (card.spRecoveryMul - 1) * mag) }));
+  if (card.spRecoveryFlat) out.push(t('{who}的干员每秒技力 {v}', { who, v: signed(card.spRecoveryFlat * mag) }));
+  if (card.spCostFlat) out.push(t('{who}的干员技力消耗 {v}', { who, v: signed(card.spCostFlat * mag) }));
+  if (card.goldPerRound) out.push(t('{who}每回合金币 {v}', { who, v: signed(card.goldPerRound * mag) }));
+  if (card.bountyGold) out.push(t('{who}击杀投放怪的赏金 {v}', { who, v: signed(card.bountyGold * mag) }));
+  if (card.deploy) out.push(t('{who}上场人数 {v}', { who, v: signed(card.deploy * mag) }));
   if (card.refreshDiscount) {
-    out.push(t('刷新费 {v}（每回合 {n} 次）', {
-      v: signed(-card.refreshDiscount * mag), n: num((card.refreshUses || 0) * mag),
+    out.push(t('{who}刷新费 {v}（每回合 {n} 次）', {
+      who, v: signed(-card.refreshDiscount * mag), n: num((card.refreshUses || 0) * mag),
     }));
   }
-  if (card.sellDiscount) out.push(t('出售价 {v}', { v: signed(-card.sellDiscount * mag) }));
+  if (card.sellDiscount) out.push(t('{who}出售价 {v}', { who, v: signed(-card.sellDiscount * mag) }));
   return out.join(' · ');
 }
 
-/** The effect of one monster entry (always applied to the enemies). */
+/** The effect of one monster entry (always applied to 双方战场的敌人 — every side's wave). */
 export function foeEffect(card) {
   if (!card) return '';
   const out = [];
-  if (card.atkMul) out.push(t('敌人攻击力 ×{v}', { v: num(card.atkMul) }));
-  if (card.hpMul) out.push(t('敌人生命值 ×{v}', { v: num(card.hpMul) }));
-  if (card.defMul) out.push(t('敌人防御力 ×{v}', { v: num(card.defMul) }));
-  if (card.speedMul) out.push(t('敌人移动速度 ×{v}', { v: num(card.speedMul) }));
-  if (card.countAdd) out.push(t('敌人数量 {v}', { v: signed(card.countAdd) }));
+  if (card.atkMul) out.push(t('双方战场的敌人攻击力 ×{v}', { v: num(card.atkMul) }));
+  if (card.hpMul) out.push(t('双方战场的敌人生命值 ×{v}', { v: num(card.hpMul) }));
+  if (card.defMul) out.push(t('双方战场的敌人防御力 ×{v}', { v: num(card.defMul) }));
+  if (card.speedMul) out.push(t('双方战场的敌人移动速度 ×{v}', { v: num(card.speedMul) }));
+  if (card.countAdd) out.push(t('双方战场的敌人数量 {v}', { v: signed(card.countAdd) }));
   return out.join(' · ');
 }
 
-/** The effect of one 强力属性 on the marked enemies. */
+/** The effect of one 强力属性 on the marked enemies (双方战场的敌人, like the monster entries). */
 export function eliteEffect(key) {
   const a = ELITE_BY_KEY.get(key);
   if (!a) return '';
-  if (a.atkMul) return t('敌人攻击力 ×{v}', { v: num(a.atkMul) });
-  if (a.hpMul) return t('敌人生命值 ×{v}', { v: num(a.hpMul) });
-  if (a.defMul) return t('敌人防御力 ×{v}', { v: num(a.defMul) });
-  if (a.speedMul) return t('敌人移动速度 ×{v}', { v: num(a.speedMul) });
+  if (a.atkMul) return t('双方战场的敌人攻击力 ×{v}', { v: num(a.atkMul) });
+  if (a.hpMul) return t('双方战场的敌人生命值 ×{v}', { v: num(a.hpMul) });
+  if (a.defMul) return t('双方战场的敌人防御力 ×{v}', { v: num(a.defMul) });
+  if (a.speedMul) return t('双方战场的敌人移动速度 ×{v}', { v: num(a.speedMul) });
   return '';
 }
 
 /**
  * The payload of the 词条说明 popup (ui/entryDetail.js) for one entry. Names and effects go through the same tables as
- * the overlay and the P4 strip; `mag` is the receiver's magnitude (2 for 自己), `picked` / `round` drive the rounds-left
- * line, and `elite` is `m.public.event.foe.elite` for a monster entry. Never throws on an unknown key.
+ * the overlay and the P4 strip; `who` is the receiver's label (自己 / 队友 / 对面 A / a player name), `packKind` the
+ * pack the entry was dealt from (归属: 我方包 / 对面包 / 默认包, 0.0.5 需求 2), `picked` / `round` drive the
+ * rounds-left line, and `elite` is `m.public.event.foe.elite` for a monster entry. Never throws on an unknown key.
  * @param {'ally'|'foe'} kind
  * @param {any} card an EVENT_CARDS / EVENT_FOE_CARDS row
- * @param {{ mag?: number, round?: number|null, picked?: number|null, target?: string, elite?: any, duration?: number|null }} [opts]
+ * @param {{ mag?: number, round?: number|null, picked?: number|null, target?: string, who?: string, packKind?: string|null, elite?: any, duration?: number|null }} [opts]
  */
-export function detailOf(kind, card, { mag = 1, round = null, picked = null, target = 'self', elite = null, duration = null } = {}) {
+export function detailOf(kind, card, {
+  mag = 1, round = null, picked = null, target = 'self', who = null, packKind = null, elite = null, duration = null,
+} = {}) {
   if (!card) return null;
   const ally = kind === 'ally';
   const look = entryLook(kind, card);
   const rounds = Math.max(1, Math.min(EVENT_DURATION_ROUNDS, Math.trunc(Number(duration ?? card.duration) || EVENT_DURATION_ROUNDS)));
+  // `who` is the receiver's LABEL (自己 / 队友 / 对面 A / a player name / 目标玩家); the effect templates add the
+  // 「X 的干员」/「X 的敌人」subject themselves, and `subject` is that full phrase for the 作用对象 row.
+  const whoLabel = who || t(TARGET_LABEL[target] || '目标玩家');
+  const subject = ally ? allySubject(card, whoLabel) : t('双方战场的敌人');
   return {
     kind,
     key: card.key,
     name: t((ally ? ALLY_NAMES : FOE_NAMES)[card.key] || card.key),
     ...look,
-    base: ally ? allyEffect(card, 1) : foeEffect(card),
-    now: ally ? allyEffect(card, mag) : foeEffect(card),
+    base: ally ? allyEffect(card, whoLabel) : foeEffect(card),
+    now: ally ? allyEffect(card, whoLabel, mag) : foeEffect(card),
     mag,
     duration: rounds,
-    targetLabel: ally
-      ? (TARGET_LABEL[target] ? t(TARGET_LABEL[target]) : t(target))
-      : t('本回合的敌人'),
+    // 归属 (0.0.5): which pack the entry was dealt from (我方包 / 对面包 / 默认包); null when unknown
+    packLabel: ally && packKind ? t(PACK_LABEL[packKind] || PACK_LABEL.default) : null,
+    subject,
+    targetLabel: ally ? subject : t('双方战场的敌人'),
     picked: picked != null && Number.isFinite(Number(picked)) ? Number(picked) : null,
     round: round != null && Number.isFinite(Number(round)) ? Number(round) : null,
     elite: elite && elite.attr ? {
@@ -210,6 +214,49 @@ export function detailOf(kind, card, { mag = 1, round = null, picked = null, tar
       effect: eliteEffect(elite.attr),
     } : null,
   };
+}
+
+/**
+ * The 词条公示 rows (0.0.5 需求 1.5): one row per PACK of this period (`m.public.event.ally.packs`) — the receiver,
+ * how many times they were selected, which pack they got (归属 + 来自), and the three entries it holds (each name
+ * opens its 词条说明). The 默认包 floor rows carry no picker. Rows for an unknown card are skipped — never guessed.
+ * @returns {Array<{ key: string, body: any }>}
+ */
+export function eventRosterRows(pub, ally, index) {
+  void index; // the packs are the CURRENT period's roster (m.public.event.ally.packs)
+  const players = Array.isArray(pub && pub.players) ? pub.players : [];
+  const byId = new Map(players.map((p) => [p.playerId, p]));
+  const packs = (ally && ally.packs) || {};
+  const selected = (ally && ally.selected) || {};
+  const out = [];
+  for (const p of players) {
+    const list = Array.isArray(packs[p.playerId]) ? packs[p.playerId] : [];
+    for (const pack of list) {
+      const cards = (Array.isArray(pack.entries) ? pack.entries : [])
+        .map((e) => ALLY_BY_KEY.get(e && e.key) || ALLY_BY_ID.get(e && e.card) || null)
+        .filter(Boolean);
+      if (!cards.length) continue;
+      const from = pack.from ? byId.get(pack.from) || null : null;
+      const label = t(PACK_LABEL[pack.kind] || PACK_LABEL.default);
+      const times = Number(selected[p.playerId]) || 0;
+      out.push({
+        key: `pack:${p.playerId}:${pack.pack ?? out.length + 1}`,
+        body: html`<span class="rospov__give">
+          <b class="rospov__p num">${pNo(p)}</b><span class="rospov__name">${p.name || '?'}</span>
+          <span class="rospov__verb">${pack.kind === 'default'
+            ? label
+            : `${label} · ${t('被选 {n} 次', { n: times })}${from ? ` · ${t('来自 {name}', { name: pLabel(from) })}` : ''}`}</span>
+          ${cards.map((card) => html`<button key=${card.key} type="button" class="rospov__eff evohist__link"
+              title=${t('点击查看词条说明')}
+              onClick=${() => openEntryDetail(detailOf('ally', card, {
+                picked: (ally && ally.round) || null, round: (pub && pub.round) || null,
+                target: pack.target || 'self', who: p.name || pNo(p), packKind: pack.kind,
+              }))}>「${t(ALLY_NAMES[card.key] || card.key)}」<${Icon} name="info" /></button>`)}
+        </span>`,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -233,9 +280,8 @@ export function EventOverlay({ pub, busy = false, onPick }) {
   const list = Array.isArray(ally.available && ally.available[myId]) ? ally.available[myId] : null;
   const available = list ? new Set(list) : null;
   const myPick = (ally.picks && ally.picks[myId]) || null;
+  // my own picks of the match, one pack per period (the per-entry history rows carry the pack marker)
   const history = Array.isArray(ally.history) ? ally.history.filter((r) => r && r.playerId === myId) : [];
-  const used = new Set(history.map((r) => r.target));
-  if (myPick) used.add(myPick.target);
   const meP = byId.get(myId) || null;
   // a spectator seat has no row in m.public and cannot be one of the four targets: no panel for it
   if (!meP) return null;
@@ -253,25 +299,28 @@ export function EventOverlay({ pub, busy = false, onPick }) {
   const eliteShare = elite ? Math.round((Number(elite.share) || 0) * 100) : 0;
   const foeDetail = foeCard ? detailOf('foe', foeCard, { elite }) : null;
 
-  // the picked entry (the result line) and the three rows of the match's selections
-  const pickedCard = myPick ? (ALLY_BY_KEY.get(myPick.key) || ALLY_BY_ID.get(myPick.card) || null) : null;
-  const pickedMag = Number(myPick && myPick.mag) || 1;
-  const pickedName = pickedCard ? t(ALLY_NAMES[pickedCard.key]) : ((myPick && myPick.key) || '');
+  // the picked pack (the result line) and the three rows of the match's selections
+  const packKindOf = (rec) => (rec && rec.packKind) || (rec && (rec.target === 'oppA' || rec.target === 'oppB') ? 'opp' : 'own');
   const pickedTarget = myPick ? myPick.target : null;
   const pickedTargetLabel = pickedTarget && TARGET_LABEL[pickedTarget] ? t(TARGET_LABEL[pickedTarget]) : '';
-  // the entry lands on the TARGET (server event.js: targetPs.eventEntries.push): only `self` reads as "you got it";
-  // a mate / opponent row says who got it, and its effect line is prefixed so it cannot be read as the picker's own.
-  const grantPrefix = pickedTarget === 'self' || !pickedTarget ? null
-    : pickedTarget === 'mate' ? t('队友获得：') : t('对方获得：');
-  const pickedEffect = allyEffect(pickedCard, pickedMag);
+  const pickedWho = pickedTarget && TARGET_LABEL[pickedTarget] ? t(TARGET_LABEL[pickedTarget]) : t('目标玩家');
+  const pickedPackLabel = t(PACK_LABEL[packKindOf(myPick)] || PACK_LABEL.own);
+  const pickedCards = (myPick && Array.isArray(myPick.entries) ? myPick.entries : [])
+    .map((e) => ALLY_BY_KEY.get(e && e.key) || ALLY_BY_ID.get(e && e.card) || null)
+    .filter(Boolean);
+  const pickedNames = pickedCards.map((c) => `「${t(ALLY_NAMES[c.key] || c.key)}」`).join('');
+  const pickedEffects = pickedCards.map((c) => allyEffect(c, pickedWho)).filter(Boolean).join(' · ');
   const rows = rounds.map((round, i) => {
     const n = i + 1;
-    const rec = history.find((r) => r.index === n) || (myPick && index === n ? myPick : null);
-    const card = rec ? (ALLY_BY_KEY.get(rec.key) || ALLY_BY_ID.get(rec.card) || null) : null;
-    const detail = card && rec ? detailOf('ally', card, {
-      mag: Number(rec.mag) || 1, picked: rec.round, round: pub.round, target: rec.target,
-    }) : null;
-    return { n, round, rec, card, detail };
+    const mine = history.filter((r) => r.index === n);
+    const rec = (myPick && index === n) ? myPick : (mine[0] || null);
+    const cards = (myPick && index === n ? pickedCards : mine.map((r) => eventAllyCard(r)).filter(Boolean));
+    const target = rec ? rec.target : null;
+    return {
+      n, round, rec, cards,
+      targetLabel: target && TARGET_LABEL[target] ? t(TARGET_LABEL[target]) : t('尚未选择'),
+      packLabel: rec ? t(PACK_LABEL[packKindOf(rec)] || PACK_LABEL.own) : null,
+    };
   });
 
   /** Why a target cannot be picked (null: it can), and its selected state. */
@@ -279,22 +328,21 @@ export function EventOverlay({ pub, busy = false, onPick }) {
     const pid = targets[key] || null;
     const player = pid ? byId.get(pid) || null : null;
     const sel = !!(myPick && myPick.target === key);
-    // 2V2 only: a target cannot be taken twice by the same player in one match. 同盟狩猎 has just self / mate for
-    // three periods, so the server deliberately does NOT apply the no-repeat rule there (event.js eventAvailableTargets).
-    const wasUsed = versus && used.has(key) && !sel;
-    const usable = available ? available.has(key) : !wasUsed && !!pid;
-    const disabled = !!myPick || busy || dead || !player || wasUsed || !usable;
+    // 0.0.5: a target may be picked again (and by several pickers) — every selection deals it another pack, so the
+    // only locks are the one pick per period and the seat's own state.
+    const usable = available ? available.has(key) : !!pid;
+    const disabled = !!myPick || busy || dead || !player || !usable;
     let why = null;
     if (dead) why = t('你已被淘汰');
-    else if (wasUsed) why = t('本局已用过');
     else if (!pid) why = versus ? t('没有这个座位') : t('没有可选的队友');
     else if (busy) why = t('正在提交…');
     else if (!ally.active) why = t('事件期已结束');
     return { player, sel, disabled, why };
   };
 
-  // 词条公示 (the server's event roster hold): every pick of this period is final and the picking UI is gone — show
-  // who gave which entry to whom, its effect, and the 5 s countdown (ui/rosterPanel.js, shared with the hunt rosters).
+  // 词条公示 (the server's event roster hold): every pack of this period is final and the picking UI is gone — show
+  // who was selected how often and which packs they got, and the 5 s countdown (ui/rosterPanel.js, shared with the
+  // hunt rosters).
   if (ally.stage === 'roster' && ally.roster) {
     const rosterRows = eventRosterRows(pub, ally, index);
     if (rosterRows.length) {
@@ -357,27 +405,31 @@ export function EventOverlay({ pub, busy = false, onPick }) {
         ${myPick ? html`<p class="evov__result" data-testid="event-result">
           <${Icon} name="check" />
           <span>${pickedTarget === 'self' || !pickedTarget
-            ? t('已选择 → 你收到了「{card}」', { card: pickedName })
-            : t('已选择 → 送给{target}「{card}」', { target: pickedTargetLabel, card: pickedName })}</span>
-          <span class="evov__eff">${grantPrefix && pickedEffect ? `${grantPrefix}${pickedEffect}` : pickedEffect}</span>
-          ${pickedCard ? html`<button type="button" class="evov__look" title=${t('点击查看词条说明')}
-            onClick=${() => openEntryDetail(detailOf('ally', pickedCard, {
-              mag: pickedMag, picked: myPick.round, round: pub.round, target: pickedTarget || 'self',
-            }))}><${Icon} name="info" />${t('词条说明')}</button>` : null}
+            ? t('已选择 → 你收到了{pack}：{cards}', { pack: pickedPackLabel, cards: pickedNames })
+            : t('已选择 → 送给{target}{pack}：{cards}', { target: pickedTargetLabel, pack: pickedPackLabel, cards: pickedNames })}</span>
+          ${pickedEffects ? html`<span class="evov__eff">${pickedEffects}</span>` : null}
+          ${pickedCards.map((card) => html`<button key=${card.key} type="button" class="evov__look" title=${t('点击查看词条说明')}
+            onClick=${() => openEntryDetail(detailOf('ally', card, {
+              mag: Number(myPick.mag) || 1, picked: myPick.round, round: pub.round, target: pickedTarget || 'self',
+              packKind: packKindOf(myPick),
+            }))}><${Icon} name="info" />${t('词条说明')}</button>`)}
           ${myPick.auto ? html`<span class="evov__auto">${t('自动选择')}</span>` : null}
         </p>` : null}
 
-        <p class="evov__hint t-dim">${versus ? t('自己接收时效果翻倍；每个目标一局只能用一次') : t('自己接收时效果翻倍；自己和队友每次都可以选')}</p>
+        <p class="evov__hint t-dim">${versus ? t('选对面发对面包（1 减益 + 2 中性），选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）') : t('选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）')}</p>
 
         <h3 class="evov__h">${t('本局选择记录')}</h3>
         <ol class="evohist" data-testid="event-history">
           ${rows.map((r) => html`<li key=${r.n} class=${cx('evohist__row', r.n === index && 'is-cur')} data-testid="event-history-row">
             <span class="evohist__n">${t('第 {n} 次', { n: r.n })}</span>
             <span class="evohist__round num">${r.round ? `R${r.round}` : '—'}</span>
-            <span class="evohist__target">${r.rec && TARGET_LABEL[r.rec.target] ? t(TARGET_LABEL[r.rec.target]) : t('尚未选择')}</span>
-            ${r.card && r.detail
-              ? html`<button type="button" class="evohist__card evohist__link" title=${t('点击查看词条说明')}
-                  onClick=${() => openEntryDetail(r.detail)}>「${t(ALLY_NAMES[r.card.key])}」<${Icon} name="info" /></button>`
+            <span class="evohist__target">${r.rec ? `${r.targetLabel}${r.packLabel ? ` · ${r.packLabel}` : ''}` : t('尚未选择')}</span>
+            ${r.cards.length
+              ? r.cards.map((card) => html`<button key=${card.key} type="button" class="evohist__card evohist__link" title=${t('点击查看词条说明')}
+                  onClick=${() => openEntryDetail(detailOf('ally', card, {
+                    mag: Number(r.rec && r.rec.mag) || 1, picked: r.rec && r.rec.round, round: pub.round,
+                    target: (r.rec && r.rec.target) || 'self', packKind: packKindOf(r.rec),
+                  }))}>「${t(ALLY_NAMES[card.key] || card.key)}」<${Icon} name="info" /></button>`)
               : html`<span class="evohist__card">—</span>`}
             ${r.rec && r.rec.auto ? html`<span class="evov__auto">${t('自动选择')}</span>` : null}
           </li>`)}

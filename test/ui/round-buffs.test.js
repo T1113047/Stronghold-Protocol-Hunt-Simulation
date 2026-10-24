@@ -47,26 +47,43 @@ function pubWith(history, over = {}) {
 
 test('the strip lists the entries I RECEIVED this round — from my own pick and from other players — then the monster entry', () => {
   const pub = pubWith([
-    // b gives their entry to their mate = a (me)
-    { round: 8, index: 2, playerId: 'b', target: 'mate', targetId: 'a', card: 1, key: 'whetstone', kind: 'up', mag: 1 },
+    // b gives their pack to their mate = a (me)
+    { round: 8, index: 2, playerId: 'b', target: 'mate', targetId: 'a', card: 1, key: 'whetstone', kind: 'up', mag: 1, packKind: 'own', pack: 1, slot: 1 },
     // an opponent gives theirs to a (me) — the "目标" rule, not "my pick"
-    { round: 8, index: 2, playerId: 'c', target: 'oppA', targetId: 'a', card: 3, key: 'armor_break', kind: 'up', mag: 1 },
-    // my own entry at 自己 is doubled (mag 2, EVENT_SELF_MUL)
-    { round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 4, key: 'blunted', kind: 'down', mag: 2 },
+    { round: 8, index: 2, playerId: 'c', target: 'oppA', targetId: 'a', card: 3, key: 'armor_break', kind: 'up', mag: 1, packKind: 'opp', pack: 1, slot: 1 },
+    // my own entry at 自己 (0.0.5: no ×2 — every value is the card's base)
+    { round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 4, key: 'blunted', kind: 'down', mag: 1, packKind: 'own', pack: 1, slot: 1 },
     // someone else's self entry: not mine, never shown
-    { round: 8, index: 2, playerId: 'c', target: 'self', targetId: 'c', card: 1, key: 'whetstone', kind: 'up', mag: 2 },
+    { round: 8, index: 2, playerId: 'c', target: 'self', targetId: 'c', card: 1, key: 'whetstone', kind: 'up', mag: 1, packKind: 'own', pack: 1, slot: 1 },
     // an earlier round: already gone
-    { round: 4, index: 1, playerId: 'b', target: 'mate', targetId: 'a', card: 2, key: 'tailwind', kind: 'up', mag: 1 },
+    { round: 4, index: 1, playerId: 'b', target: 'mate', targetId: 'a', card: 2, key: 'tailwind', kind: 'up', mag: 1, packKind: 'own', pack: 1, slot: 1 },
   ]);
   const rows = roundBuffRows(pub, 'a');
   assert.deepEqual(rows.map((r) => r.kind), ['ally', 'ally', 'ally', 'foe']);
   assert.deepEqual(rows.map((r) => r.name), ['磨刃', '破甲', '钝口', '獠牙']);
-  assert.deepEqual(rows.slice(0, 3).map((r) => r.effect), ['攻击力 +20%', '无视防御 +22%', '攻击力 -18%']);
-  assert.equal(rows[3].effect, '敌人攻击力 ×1.15', 'the monster entry, in the overlay\'s wording');
+  // every effect line names its subject (0.0.5 需求 2): the strip is the viewer's own list → 「自己的干员」
+  assert.deepEqual(rows.slice(0, 3).map((r) => r.effect),
+    ['自己的干员攻击力 +20%', '自己的干员无视防御 +22%', '自己的干员攻击力 -9%']);
+  assert.equal(rows[3].effect, '双方战场的敌人攻击力 ×1.15', 'the monster entry, in the overlay\'s wording');
   assert.equal(rows[3].elite, '本回合 10% 的敌人带「疾行」', '强力属性 merged into the monster line');
-  assert.equal(rows[0].title, '磨刃 攻击力 +20%', 'the full line stays in the title when CSS truncates the text');
+  assert.equal(rows[0].title, '磨刃 自己的干员攻击力 +20%', 'the full line stays in the title when CSS truncates the text');
   assert.equal(rows[0].left, 4, 'four rounds left on the pick round');
   assert.equal(rows[3].left, 1, 'the monster entry is this round only');
+  // the 归属 marker (我方包 / 对面包) travels into the popup payload
+  assert.deepEqual(rows.slice(0, 3).map((r) => r.detail.packLabel), ['我方包', '对面包', '我方包']);
+});
+
+test('a 默认包 row (0.0.5) renders for its receiver: no picker, no target — the targetId IS the receiver', () => {
+  const pub = pubWith([
+    { round: 8, index: 2, playerId: null, target: null, targetId: 'a', card: 5, key: 'heavy_crossbow', kind: 'mid', mag: 1, packKind: 'default', pack: 1, slot: 1 },
+    { round: 8, index: 2, playerId: null, target: null, targetId: 'b', card: 6, key: 'rapid_volley', kind: 'mid', mag: 1, packKind: 'default', pack: 1, slot: 1 },
+  ]);
+  pub.event.foe = null;
+  assert.equal(eventReceiver(pub.event.ally.history[0], {}), 'a', 'a default row resolves through its targetId');
+  const rows = roundBuffRows(pub, 'a');
+  assert.deepEqual(rows.map((r) => r.name), ['重弩'], "another player's default pack is not mine");
+  assert.equal(rows[0].detail.packLabel, '默认包');
+  assert.equal(rows[0].effect, '自己的干员攻击力 +20% · 自己的干员攻速 -18');
 });
 
 test('the receiver is ally.targets[picker][target]; a missing map falls back to the record\'s targetId; no target means no row', () => {
@@ -114,12 +131,12 @@ test('nothing renders outside a hunt mode, without an event this round, or for a
 });
 
 test('经济类负面词条（空手而归）在 P4 词条条只显示 1 回合，弹窗显示持续 1 回合', () => {
-  const pub = pubWith([{ round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 23, key: 'empty_handed', kind: 'down', mag: 2 }]);
+  const pub = pubWith([{ round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 23, key: 'empty_handed', kind: 'down', mag: 1, packKind: 'opp', pack: 1, slot: 1 }]);
   pub.event.foe = null;
   const r8 = roundBuffRows(pub, 'a');
   assert.equal(r8.length, 1);
   assert.equal(r8[0].detail.duration, 1);
-  assert.equal(r8[0].effect, '每回合金币 -4', 'self doubles the -2');
+  assert.equal(r8[0].effect, '自己每回合金币 -2', 'the base −2 (no multiplier since 0.0.5)');
   pub.round = 9;
   pub.event.ally.round = 9;
   assert.deepEqual(roundBuffRows(pub, 'a'), [], 'the economy debuff is gone after its own round');
@@ -152,10 +169,10 @@ test('the component reuses the 事件期 overlay: no second card table, no new m
   assert.match(css, /\.rbuff__left \{/);
 });
 
-test('each strip row carries the 词条说明 popup payload: class icon, kind tone, base vs doubled effect, rounds left', () => {
+test('each strip row carries the 词条说明 popup payload: class icon, kind tone, subject + 归属, base effect, rounds left', () => {
   const pub = pubWith([
-    { round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 4, key: 'blunted', kind: 'down', mag: 2 },
-    { round: 6, index: 1, playerId: 'b', target: 'mate', targetId: 'a', card: 2, key: 'tailwind', kind: 'up', mag: 1 },
+    { round: 8, index: 2, playerId: 'a', target: 'self', targetId: 'a', card: 4, key: 'blunted', kind: 'down', mag: 1, packKind: 'own', pack: 1, slot: 1 },
+    { round: 6, index: 1, playerId: 'b', target: 'mate', targetId: 'a', card: 2, key: 'tailwind', kind: 'up', mag: 1, packKind: 'opp', pack: 1, slot: 1 },
   ]);
   const rows = roundBuffRows(pub, 'a');
   const ally = rows.find((r) => r.name === '钝口');
@@ -163,22 +180,26 @@ test('each strip row carries the 词条说明 popup payload: class icon, kind to
   assert.equal(ally.detail.icon, 'sword', 'output entries use the sword icon');
   assert.equal(ally.detail.tone, 'red', 'a down entry is red');
   assert.equal(ally.detail.classLabel, '输出');
-  assert.equal(ally.detail.base, '攻击力 -9%', 'the base effect at ×1');
-  assert.equal(ally.detail.now, '攻击力 -18%', 'self doubles it');
-  assert.equal(ally.detail.mag, 2);
+  // 0.0.5: values are always the base (the 自己 ×2 multiplier is gone), and every line names its subject
+  assert.equal(ally.detail.base, '自己的干员攻击力 -9%', 'the base effect');
+  assert.equal(ally.detail.now, '自己的干员攻击力 -9%', 'no target multiplier any more');
+  assert.equal(ally.detail.mag, 1);
+  assert.equal(ally.detail.subject, '自己的干员', '作用对象: 「X 的干员」');
+  assert.equal(ally.detail.packLabel, '我方包', '归属: the pack the entry was dealt from');
   assert.equal(ally.detail.picked, 8);
   assert.equal(ally.detail.round, 8);
-  assert.equal(ally.detail.targetLabel, '自己');
   const tail = rows.find((r) => r.name === '追风');
   assert.equal(tail.detail.picked, 6);
-  assert.equal(tail.detail.mag, 1, 'a mate\'s entry stays at ×1');
+  assert.equal(tail.detail.mag, 1);
+  assert.equal(tail.detail.packLabel, '对面包');
   const foe = rows.find((r) => r.kind === 'foe');
   assert.equal(foe.detail.icon, 'sword');
   assert.equal(foe.detail.tone, 'red', 'an unfavourable monster entry is red');
   assert.equal(foe.detail.elite.name, '疾行');
   assert.equal(foe.detail.elite.share, 10);
   assert.equal(foe.detail.elite.count, 2);
-  assert.equal(foe.detail.elite.effect, '敌人移动速度 ×1.2');
+  assert.equal(foe.detail.elite.effect, '双方战场的敌人移动速度 ×1.2');
+  assert.equal(foe.detail.subject, '双方战场的敌人', 'a monster entry always names 双方战场的敌人');
   // the popup is mounted once at the game root, above the event overlay's stacking context, not inside the HUD strip
   const game = read('public/js/screens/game.js');
   const detail = read('public/js/ui/entryDetail.js');
@@ -186,6 +207,11 @@ test('each strip row carries the 词条说明 popup payload: class icon, kind to
   assert.match(game, /<\$\{EntryDetailDialog\} detail=\$\{entryDetail\} onClose=\$\{closeEntryDetail\} \/>/);
   assert.match(detail, /export function openEntryDetail/);
   assert.match(detail, /EVENT_DURATION_ROUNDS/);
-  assert.match(detail, /选择「自己」时所有数值 ×2/);
+  // the dialog labels 归属 (我方包 / 对面包 / 默认包) and 作用对象, and explains the 发包规则 (0.0.5 需求 2)
+  assert.match(detail, /t\('归属'\)/);
+  assert.match(detail, /t\('作用对象'\)/);
+  assert.match(detail, /data-testid="entry-pack"/);
+  assert.match(detail, /选对面发对面包（1 减益 \+ 2 中性），选自己或队友发我方包（1 增益 \+ 2 中性）；没被选中的玩家拿默认包（3 中性）/);
   assert.match(detail, /多个词条按环境乘区相乘/);
+  assert.doesNotMatch(detail, /×2/, 'the 「选自己 ×2」note is gone with the rule');
 });

@@ -2,23 +2,26 @@
 // effect THIS round — one line per entry, with the same names and effect numbers as the 事件期 overlay.
 //
 // Sources (m.public.event, server/match/match/event.js eventView):
-//   ally.history  every pick of the match: { round, index, playerId, target, targetId, card, key, kind, mag, auto }
+//   ally.history  every ENTRY of the match (0.0.5 发包规则: a pick deals a pack of three), one row each:
+//                 { round, index, playerId, target, targetId, card, key, kind, mag, auto, duration, packKind, pack, slot }
 //   ally.targets  { [pickerId]: { self, mate, oppA, oppB } } — the playerId of each target key
 //   foe           this period's monster entry: { round, card, key, elite: { share, attr, count } }
 //
-// The ally lines are "who RECEIVED it", not "what I picked": another player may send their entry to me. A record counts
+// The ally lines are "who RECEIVED it", not "what I picked": another player may send their pack to me. A row counts
 // when it is still in force this round (`round` ∈ [picked, picked + duration − 1], EVENT_DURATION_ROUNDS — an expired
 // entry is no longer shown) and its receiver resolves to myId. The receiver is
 // ally.targets[pickerId][target] (the map's meaning at view time) or, when that map no longer carries the picker / key,
-// the record's own `targetId` (written by the server at pick time — a co-op mate can be recomputed when a teammate
-// leaves). A record predating `target` has no receiver at all and is SKIPPED — never guessed, never thrown on.
+// the row's own `targetId` (written by the server at pick time — a co-op mate can be recomputed when a teammate
+// leaves); a 默认包 row has no picker at all and its `targetId` IS the receiver. A row predating `target` has no
+// receiver at all and is SKIPPED — never guessed, never thrown on.
 // The monster line is this round's foe entry only (`foe.round === pub.round`), with the 强力属性 share / attribute
 // merged into the same line. Outside a hunt mode m.public.event is null, so nothing renders there; a round without an
 // event renders nothing either, and no empty row is left behind.
 //
-// The names, the effect lines and the receiver rule come from ui/eventOverlay.js (ALLY_NAMES / FOE_NAMES / allyEffect /
-// foeEffect / eventAllyCard / eventFoeCard / eventReceiver) — never a second copy of the 24 + 12 card tables. No new
-// msgids: the 强力属性 line is the overlay's own 「本回合 {share}% 的敌人带「{attr}」」.
+// The names, the effect lines (every one names its subject: 自己的干员 / 自己的敌人 / 双方战场的敌人, 0.0.5 需求 2),
+// the 归属 marker and the receiver rule come from ui/eventOverlay.js (ALLY_NAMES / FOE_NAMES / PACK_LABEL / allyEffect /
+// foeEffect / eventAllyCard / eventFoeCard / eventReceiver / detailOf) — never a second copy of the 24 + 12 card
+// tables. No new msgids: the 强力属性 line is the overlay's own 「本回合 {share}% 的敌人带「{attr}」」.
 import { html, Icon } from './components.js';
 import { t } from '../../../shared/i18n.js';
 import { EVENT_DURATION_ROUNDS } from '../../../shared/constants.js';
@@ -57,11 +60,12 @@ export function roundBuffRows(pub, myId) {
     if (eventReceiver(rec, targets) !== myId) continue;
     const mag = Number(rec.mag) || 1;
     const name = t(ALLY_NAMES[card.key] || card.key);
-    const effect = allyEffect(card, mag);
+    // the strip is the viewer's own list: every line names 自己 as its subject (0.0.5 需求 2)
+    const effect = allyEffect(card, t('自己'), mag);
     rows.push({
       kind: 'ally', key: card.key, name, effect, elite: '', title: effect ? `${name} ${effect}` : name,
       left: Math.max(1, picked + duration - round),
-      detail: detailOf('ally', card, { mag, picked, round, target: 'self', duration }),
+      detail: detailOf('ally', card, { mag, picked, round, target: 'self', who: t('自己'), packKind: rec.packKind, duration }),
     });
   }
   if (foe && Number(foe.round) === round) {

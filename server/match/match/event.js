@@ -1,14 +1,17 @@
 // server/match/match/event.js — Match methods: the 2V2 事件期 (类肉鸽词条). Three periods per match, aligned with the
 // 狩猎期: E1 = contestStartRound (R4/R5/R6), E2 = E1 + 4 (R8/R9/R10), E3 = R13 (the 最终狩猎); none is a boss round.
-// Each period runs after ROUND_START and before that round's 机变 / 休整期. Every event draws TWO entries:
-//   1. the ally entry: every alive player picks ONE of four targets (self / mate / oppA / oppB); a target cannot be
-//      picked twice by the same player in one match. The TYPE odds move with the sequence (EVENT_SEQUENCE: E1 friendly,
-//      E2 neutral, E3 debuff-heavy) and the entry is drawn from EVENT_CARDS with the seeded `rngEvent` stream. The ally
-//      pool is shared: a card already drawn in this match is not drawn again while the kind has an unused card (and
-//      never twice for the same player);
+// Each period runs after ROUND_START and before that round's 机变 / 休整期. The three periods run under ONE identical
+// rule set (0.0.5 需求 1: no per-sequence odds, no 自己 ×2, no one-target-per-match limit). Every event has TWO
+// channels:
+//   1. ALLY packs: every alive player picks ONE of four targets (self / mate / oppA / oppB; a target may be picked
+//      again later and by several pickers). Each selection deals ONE pack of EVENT_PACK_SIZE entries to the TARGET
+//      (chosen N times → N packs; 对面包 on an oppA / oppB pick = 1 减益 + 2 中性, 我方包 on a self / mate pick = 1
+//      增益 + 2 中性 — EVENT_PACK_KINDS), drawn from EVENT_CARDS with the seeded `rngEvent` stream. A player chosen 0
+//      times receives ONE 默认包 (3 中性) when the period closes — the per-event floor. The used-card bag is
+//      match-global (shared across players and periods): a card is not drawn again while its kind has an unused one;
 //   2. the monster entry: drawn once when the period opens, on its own seeded stream (`rngFoeEvent`), independent of the
-//      target choices, with its own per-sequence odds. It merges into THAT round's wave (normal + 赏金怪, never a
-//      player's mods, never a bounty amount). Each period ALSO marks a share of that wave as 强力 with one extra
+//      target choices, with the unified foe odds (EVENT_FOE_ODDS). It merges into THAT round's wave (normal + 赏金怪,
+//      never a player's mods, never a bounty amount). Each period ALSO marks a share of that wave as 强力 with one extra
 //      attribute (EVENT_FOE_ELITES, its own `rngFoeElite` stream; the marked runs carry `elite: true`).
 //
 // Effect injection: the ally entries accumulate on the target's PlayerState (eventEntries / eventMods). Battles receive
@@ -16,17 +19,19 @@
 // read the same fields: income (startRound), refresh / sell prices (economy.js), the deploy cap (basics.js) and the
 // placed-monster bounty (confront.js applyConfront, +3 coins per kill). An entry is in force for EVENT_DURATION_ROUNDS
 // rounds from the one it was picked in (round … round+duration−1), then expires: eventModsFor / eventBattleRefs filter
-// the accumulated log by the current round; startRound re-derives eventMods each round. History keeps all picks.
+// the accumulated log by the current round; startRound re-derives eventMods each round. History keeps every entry.
 //
 // The phase is timed (EVENT_PICK_SECONDS; always, also in a single-human versus room) and every botControlled seat picks
-// at once. A timeout — or a seat that never answers — is auto-picked by botEventTarget (the highest expected value),
-// so the phase can never stall.
+// at once. A timeout — or a seat that never answers — is auto-picked by botEventTarget (an un-chosen opponent seat
+// first, spreading the packs; 自己 without an opponent side), so the phase can never stall. AIs and timeouts are dealt
+// the same packs as humans — never a discount.
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import {
-  PHASE, ERR, EVENT_TARGETS, EVENT_SELF_MUL, EVENT_PICK_SECONDS, EVENT_CARDS, EVENT_SEQUENCE,
-  EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_ROSTER_MS, EVENT_DURATION_ROUNDS, COOP_HUNT,
+  PHASE, ERR, EVENT_TARGETS, EVENT_PACK_SIZE, EVENT_PACK_KINDS, EVENT_PICK_SECONDS, EVENT_CARDS,
+  EVENT_FOE_ODDS, EVENT_FOE_ELITE_SHARES, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_ROSTER_MS, EVENT_DURATION_ROUNDS,
+  COOP_HUNT,
 } from '../../../shared/constants.js';
 import { OK, fail } from './common.js';
 
@@ -35,8 +40,6 @@ const CARD_BY_KEY = new Map(EVENT_CARDS.map((c) => [c.key, c]));
 const FOE_BY_ID = new Map(EVENT_FOE_CARDS.map((c) => [c.id, c]));
 const FOE_BY_KEY = new Map(EVENT_FOE_CARDS.map((c) => [c.key, c]));
 const ELITE_BY_KEY = new Map(EVENT_FOE_ELITES.map((c) => [c.key, c]));
-/** The event sequence row of a 1-based order (clamped; default E2). */
-const sequenceAt = (sequence) => EVENT_SEQUENCE[Math.max(0, Math.min(EVENT_SEQUENCE.length - 1, (Number(sequence) || 2) - 1))];
 /** The ally entry of an id (1…24) / key, or null. */
 export const eventCardById = (id) => CARD_BY_ID.get(id) ?? null;
 export const eventCardByKey = (key) => CARD_BY_KEY.get(key) ?? null;
@@ -46,45 +49,6 @@ export const eventFoeCardByKey = (key) => FOE_BY_KEY.get(key) ?? null;
 /** A 强力属性 (elite attribute) of a key, or null. */
 export const eventFoeEliteByKey = (key) => ELITE_BY_KEY.get(key) ?? null;
 
-/**
- * Type odds of an ally pick in a sequence (1…3; default E2). The sequence row applies to the ally channel as a whole —
- * the target decides WHO receives the entry, not the odds (user 2026-10-17's per-order table supersedes the old
- * target-kind split).
- */
-export function eventOddsFor(target, sequence = 2) {
-  void target;
-  return sequenceAt(sequence).allyOdds;
-}
-
-/**
- * The magnitude multiplier of a target: 2 for self (EVENT_SELF_MUL), 1 otherwise — it scales every numeric value of the
- * entry (ATTACK / HP / DEF / ASPD / SP / gold / regen / taken / enemy speed, and the refresh-uses count).
- */
-export const eventMagnitude = (target) => (target === 'self' ? EVENT_SELF_MUL : 1);
-
-/**
- * Draw the type of a pick: one rng() call against the sequence's ally odds in percent (down / mid / up).
- * @param {() => number} rng seeded stream (match.rngEvent)
- * @param {string} target target key (kept for call-site clarity; odds are per sequence)
- * @param {number} [sequence] 1-based event order (default 2)
- * @returns {'down'|'mid'|'up'}
- */
-export function eventKindOf(rng, target, sequence = 2) {
-  const odds = eventOddsFor(target, sequence);
-  const r = rng() * 100;
-  if (r < odds.down) return 'down';
-  if (r < odds.down + odds.mid) return 'mid';
-  return 'up';
-}
-
-/** Draw one entry of a type uniformly (one rng() call). */
-export function eventCardOfKind(rng, kind) {
-  const pool = EVENT_CARDS.filter((c) => c.kind === kind);
-  if (!pool.length) return null;
-  const i = Math.max(0, Math.min(pool.length - 1, Math.floor(rng() * pool.length)));
-  return pool[i];
-}
-
 /** One entry of a pool uniformly among the entries whose id is not in `used`; null when every one is used. */
 function pickUnused(rng, pool, used) {
   const avail = pool.filter((c) => !used || !used.has(c.id));
@@ -93,31 +57,55 @@ function pickUnused(rng, pool, used) {
   return avail[i];
 }
 
+/** One entry of a pool uniformly (one rng() call; null when the pool is empty). */
+function pickAny(rng, pool) {
+  if (!pool.length) return null;
+  const i = Math.max(0, Math.min(pool.length - 1, Math.floor(rng() * pool.length)));
+  return pool[i];
+}
+
 /**
- * Draw the ally entry of a rolled type without repeating a card of this match: first among the match's unused cards of
- * that type, then any match-unused card (a kind whose shared bag is empty — with 24 cards and at most 12 ally draws the
- * whole pool never runs out, so the match sees NO duplicate), then that player's unused cards of the type, then the
- * type's first card (unreachable today).
+ * Draw the ally entry of a rolled kind without repeating a card of THIS match (0.0.5 需求 1.3 重复规则): first among the
+ * match's unused cards of that kind (the used bag `usedMatch` is match-global — shared across players and periods),
+ * then — once the kind's own pool is exhausted — any card of that kind again (the class-scoped refinement; the down
+ * pool has only a few cards, so stacking packs repeats inside the kind first). Never crosses kinds: a kind whose pool
+ * is exhausted repeats instead of borrowing another kind's card.
  * @param {() => number} rng
  * @param {'down'|'mid'|'up'} kind
  * @param {Set<number>} usedMatch cards already drawn this match
- * @param {Set<number>} usedPlayer cards already drawn by this player
  */
-export function eventDrawAlly(rng, kind, usedMatch = new Set(), usedPlayer = new Set()) {
+export function eventDrawAlly(rng, kind, usedMatch = new Set()) {
   const byKind = EVENT_CARDS.filter((c) => c.kind === kind);
-  return pickUnused(rng, byKind, usedMatch)
-    ?? pickUnused(rng, EVENT_CARDS, usedMatch)
-    ?? pickUnused(rng, byKind, usedPlayer)
-    ?? byKind[0]
-    ?? null;
+  return pickUnused(rng, byKind, usedMatch) ?? pickAny(rng, byKind);
 }
 
-/** The type odds of a monster entry in a sequence (1…3; default E2). */
-export const eventFoeOdds = (sequence = 2) => sequenceAt(sequence).foeOdds;
+/**
+ * Draw one pack of EVENT_PACK_SIZE entries in EVENT_PACK_KINDS order (the distinctive card first, then the neutral
+ * fillers), marking every draw in the match-global `usedMatch` bag. Null entries are dropped (an empty kind pool —
+ * impossible with the shipped tables).
+ * @param {() => number} rng
+ * @param {'opp'|'own'|'default'} packKind
+ * @param {Set<number>} usedMatch
+ * @returns {Array<{ id: number, key: string, kind: string }>}
+ */
+export function eventDrawPack(rng, packKind, usedMatch = new Set()) {
+  const kinds = EVENT_PACK_KINDS[packKind] || EVENT_PACK_KINDS.default;
+  const out = [];
+  for (const kind of kinds.slice(0, Math.max(1, EVENT_PACK_SIZE))) {
+    const card = eventDrawAlly(rng, kind, usedMatch);
+    if (!card) continue;
+    usedMatch.add(card.id);
+    out.push(card);
+  }
+  return out;
+}
 
-/** Draw the monster entry's type (one rng() call against the sequence's foe odds). */
-export function eventFoeKindOf(rng, sequence = 2) {
-  const odds = eventFoeOdds(sequence);
+/** The monster channel's unified odds (25 / 40 / 35 in every period since 0.0.5). */
+export const eventFoeOdds = () => EVENT_FOE_ODDS;
+
+/** Draw the monster entry's kind (one rng() call against the unified foe odds). */
+export function eventFoeKindOf(rng) {
+  const odds = EVENT_FOE_ODDS;
   const r = rng() * 100;
   if (r < odds.favor) return 'favor';
   if (r < odds.favor + odds.mid) return 'mid';
@@ -138,33 +126,12 @@ export function eventFoeMeanEv(kind) {
 }
 
 /**
- * The expected value of the monster draw from OUR side: the sequence's odds over the three type means. E2 is exactly
- * −0.10 (tier 2); E1 is +0.10, E3 −0.25 — see the report for the full table.
+ * The expected value of the monster draw from OUR side: the unified odds over the three kind means — exactly −0.10
+ * (25 / 40 / 35 on +1 / 0 / −1) in every period since 0.0.5.
  */
-export function eventFoeEv(sequence = 2) {
-  const odds = eventFoeOdds(sequence);
+export function eventFoeEv() {
+  const odds = EVENT_FOE_ODDS;
   return (odds.favor * eventFoeMeanEv('favor') + odds.mid * eventFoeMeanEv('mid') + odds.unfavor * eventFoeMeanEv('unfavor')) / 100;
-}
-
-/** The mean AI value of a type's entries (0 when the type is empty — impossible today). */
-function meanEv(kind) {
-  const pool = EVENT_CARDS.filter((c) => c.kind === kind);
-  if (!pool.length) return 0;
-  return pool.reduce((n, c) => n + (Number(c.ev) || 0), 0) / pool.length;
-}
-
-/**
- * The expected value of picking `target` in a sequence, from the PICKER's side (the AI's heuristic; not a game rule):
- * self = +EV × EVENT_SELF_MUL, mate = +EV, an opponent = −EV (a benefit to the opponent is a loss for us).
- * @param {string} target target key
- * @param {number} [sequence] 1-based event order (default 2)
- */
-export function eventEvFor(target, sequence = 2) {
-  const odds = eventOddsFor(target, sequence);
-  const raw = (odds.down * meanEv('down') + odds.mid * meanEv('mid') + odds.up * meanEv('up')) / 100;
-  if (target === 'self') return raw * EVENT_SELF_MUL;
-  if (target === 'mate') return raw;
-  return -raw;
 }
 
 /** A multiplier after the target's magnitude: the BONUS doubles (`1 + (m − 1) × mag`), not the total. */
@@ -217,8 +184,9 @@ export function eventActiveEntries(entries, round = null) {
  *   ① each source multiplies once: `stat = base × Π(1 + p_i)`;
  *   ② flat values (ASPD / SP recovery / SP cost) are highest priority, added to the panel first and never scaled;
  *   ③ the bucket is event-only and never mixes with the additive pool of bonds / equipment / skills / 机变.
- * `dmgTakenMul` / `enemySpeedMul` / `moveMul` / `spRecoveryMul` multiply here too (each entry's own value; self ×2
- * doubles the bonus part). Entries are filtered to those in force at `round` (EVENT_DURATION_ROUNDS); no `round` means
+ * `dmgTakenMul` / `enemySpeedMul` / `moveMul` / `spRecoveryMul` multiply here too (each entry's own `mag` — always 1
+ * since 0.0.5; the scaling stays for hand-built states). Entries are filtered to those in force at `round`
+ * (EVENT_DURATION_ROUNDS); no `round` means
  * the whole log (the raw accumulation, used by the pure helpers / tests).
  * @param {Array<{ card: object, mag?: number, round?: number }>} entries
  * @param {number|null} [round] current absolute round (null = no filter)
@@ -346,16 +314,14 @@ export class MatchEvent {
   }
 
   /**
-   * The target keys this player may still pick. 2V2: not used yet and mapped to a seat (a target cannot be repeated in
-   * one match). 同盟狩猎 has only two targets for three events, so the no-repeat rule would leave E3 with nothing —
-   * co-op keeps both `self` / `mate` available every event [ASSUMED: the user's spec fixes the two targets but not the
-   * repeat rule; the 2V2 no-repeat rule cannot hold with two targets and three events].
+   * The target keys this player may still pick. Since 0.0.5 there is NO one-target-per-match limit any more (a target
+   * may be picked again and by several pickers — each selection deals it another pack), so every mapped, living seat
+   * stays available in every period — 2V2 and 同盟狩猎 alike.
    */
   eventAvailableTargets(ps) {
-    const used = this.isVersus ? new Set(Array.isArray(ps?.eventTargets) ? ps.eventTargets : []) : new Set();
     const map = this.eventTargetMap(ps);
     // a target must be a live seat (self is checked by the caller; mate never points at a dead / departed teammate)
-    return this.eventTargetKeys().filter((key) => !used.has(key) && map[key] && map[key].alive && !map[key].left);
+    return this.eventTargetKeys().filter((key) => map[key] && map[key].alive && !map[key].left);
   }
 
   /** Open the round's event period (from MatchPhases.afterRoundStart, at ROUND_START). */
@@ -366,17 +332,16 @@ export class MatchEvent {
     this.phase = PHASE.EVENT;
     this.eventIndex = (Number(this.eventIndex) || 0) + 1;
     this.eventStage = null;
-    this.event = { round: this.round, index: this.eventIndex, picks: new Map(), done: false, rosterUntil: 0 };
+    this.event = { round: this.round, index: this.eventIndex, picks: new Map(), packs: new Map(), done: false, rosterUntil: 0 };
     // the monster entry: drawn once for THIS period, on its own stream and before any player picks, so it can never
-    // depend on the targets chosen (a separate channel; public to both teams). The sequence row moves its odds.
-    const seq = Math.max(1, Math.min(EVENT_SEQUENCE.length, this.eventIndex));
-    const foeKind = eventFoeKindOf(this.rngFoeEvent, seq);
+    // depend on the targets chosen (a separate channel; public to both teams). The odds are unified since 0.0.5.
+    const foeKind = eventFoeKindOf(this.rngFoeEvent);
     const foeCard = eventFoeCardOfKind(this.rngFoeEvent, foeKind, this.eventUsedFoe);
     if (foeCard) {
       this.eventUsedFoe.add(foeCard.id);
       this.foeEvent = { round: this.round, index: this.eventIndex, card: foeCard, elite: null };
       // the 强力属性 subset: share / attribute / the marked unit count, all on the seeded rngFoeElite stream
-      this.foeEvent.elite = this._drawFoeElite(seq);
+      this.foeEvent.elite = this._drawFoeElite();
       this.eventFoeHistory.push({
         round: this.round, index: this.eventIndex, card: foeCard.id, key: foeCard.key, kind: foeCard.kind,
         elite: this.publicFoeElite(),
@@ -406,22 +371,34 @@ export class MatchEvent {
   }
 
   /**
-   * The AI's target: the available target with the highest eventEvFor (self ×2 included); a tie takes the earlier key of
-   * EVENT_TARGETS (self / mate / oppA / oppB). Null when nothing is left (impossible with 3 events / 4 targets).
+   * The AI's target (0.0.5 需求 1.4): spread the packs across the opponent side — an OPPOSING seat that has not been
+   * selected in THIS period yet comes first (several bots / auto-picks land on different seats), then 自己 when no
+   * un-chosen opponent is left (同盟狩猎 has no opponent side at all, so it always ends at 自己). `mate` is never a
+   * bot's choice [ASSUMED: the spec's fallback is 自己; a pick still has to resolve for a seat whose own side is gone,
+   * so a living mate is the last resort]. The timeout auto-pick runs exactly this rule (finishEvent).
    */
   botEventTarget(ps) {
-    let best = null;
-    for (const key of this.eventAvailableTargets(ps)) {
-      const ev = eventEvFor(key);
-      if (!best || ev > best.ev + 1e-9) best = { key, ev };
+    const map = this.eventTargetMap(ps);
+    const usable = (key) => {
+      const tp = map[key];
+      return tp && tp.alive && !tp.left ? tp : null;
+    };
+    const taken = new Set();
+    for (const rec of (this.event && this.event.picks ? this.event.picks.values() : [])) {
+      if (rec && rec.targetId) taken.add(rec.targetId);
     }
-    return best ? best.key : null;
+    for (const key of ['oppA', 'oppB']) {
+      const tp = usable(key);
+      if (tp && !taken.has(tp.playerId)) return key;
+    }
+    if (usable('self')) return 'self';
+    return usable('mate') ? 'mate' : null;
   }
 
   /**
-   * g.event.pick { target }: give one entry to one target. Server-authoritative validation:
+   * g.event.pick { target }: give one pack to one target. Server-authoritative validation:
    *   * the phase and the target's map (ERR.WRONG_PHASE / ERR.ELIMINATED / ERR.BAD_TARGET),
-   *   * no repeated target in this match (ERR.ALREADY).
+   *   * one pick per player per period (ERR.ALREADY); a target may repeat across periods (0.0.5).
    * @param {import('../PlayerState.js').PlayerState} ps
    * @param {'self'|'mate'|'oppA'|'oppB'} target
    */
@@ -432,43 +409,81 @@ export class MatchEvent {
     const targetPs = this.eventTargetMap(ps)[target];
     if (!targetPs || !targetPs.alive || targetPs.left) return fail(ERR.BAD_TARGET);
     if (this.event.picks.has(ps.playerId)) return fail(ERR.ALREADY);
-    if (this.isVersus && ps.eventTargets.includes(target)) return fail(ERR.ALREADY, 'target already used this match');
     return this._eventPick(ps, target);
   }
 
-  /** Draw and apply one pick (shared by the intent, the AI and the timeout auto-pick). */
+  /**
+   * Draw and apply the pack of one pick (shared by the intent, the AI and the timeout auto-pick): the pick's side
+   * decides the pack kind (oppA / oppB → 对面包 with 1 减益 + 2 中性, self / mate → 我方包 with 1 增益 + 2 中性;
+   * EVENT_PACK_KINDS), every entry of the pack lands on the TARGET and lasts its own duration (空手而归-style entries
+   * settle at once). A player selected N times in one period simply accumulates N packs.
+   */
   _eventPick(ps, target, { auto = false } = {}) {
     const targetPs = this.eventTargetMap(ps)[target];
     if (!targetPs || !targetPs.alive || targetPs.left) return fail(ERR.BAD_TARGET);
-    const seq = Math.max(1, Math.min(EVENT_SEQUENCE.length, this.eventIndex));
-    const kind = eventKindOf(this.rngEvent, target, seq);
-    const usedPlayer = new Set(Array.isArray(ps.eventCards) ? ps.eventCards : []);
-    const card = eventDrawAlly(this.rngEvent, kind, this.eventUsedAlly, usedPlayer);
-    if (!card) return fail(ERR.INTERNAL);
-    this.eventUsedAlly.add(card.id);
+    const packKind = target === 'oppA' || target === 'oppB' ? 'opp' : 'own';
+    const cards = eventDrawPack(this.rngEvent, packKind, this.eventUsedAlly);
+    if (!cards.length) return fail(ERR.INTERNAL);
     if (!Array.isArray(ps.eventCards)) ps.eventCards = [];
-    ps.eventCards.push(card.id);
-    const mag = eventMagnitude(target);
-    const rec = { target, targetId: targetPs.playerId, card: card.id, key: card.key, kind: card.kind, mag, auto: !!auto };
+    for (const card of cards) ps.eventCards.push(card.id);
     ps.eventTargets.push(target);
+    const pack = this._dealPack(targetPs, {
+      kind: packKind, from: ps.playerId, target, auto: !!auto,
+    }, cards);
+    const rec = {
+      target, targetId: targetPs.playerId,
+      // kept as the first-entry summary an old client reads (`m.event` / `ally.picks`); the full pack is `entries`
+      card: cards[0].id, key: cards[0].key, kind: cards[0].kind, mag: 1, auto: !!auto,
+      round: this.round, packKind, pack: pack.pack, entries: pack.entries,
+    };
     this.event.picks.set(ps.playerId, rec);
-    const entryDuration = eventCardDuration(card);
-    targetPs.eventEntries.push({ card, duration: entryDuration, mag, from: ps.playerId, round: this.round, target });
-    targetPs.eventMods = eventModsFor(targetPs.eventEntries, this.round);
-    // A one-round economic entry (空手而归 −2) has no income window left: R's income settled BEFORE the event period,
-    // and R+1 filters it out by duration. Apply the delta once, right here (user 2026-10-21).
-    if (entryDuration === 1 && Number(card.goldPerRound)) {
-      const one = Math.round(Number(card.goldPerRound) * mag);
-      targetPs.funds = Math.max(0, (Number(targetPs.funds) || 0) + one);
-    }
     this.broadcast({
       t: 'm.event', round: this.round, index: this.event.index, playerId: ps.playerId,
-      target, targetId: targetPs.playerId, card: card.id, key: card.key, kind: card.kind, mag, auto: !!auto,
+      target, targetId: targetPs.playerId, card: rec.card, key: rec.key, kind: rec.kind, mag: 1, auto: !!auto,
+      packKind, pack: pack.pack, entries: pack.entries,
     });
     this.markPrivate(targetPs);
     this.markPublic();
     this.maybeFinishEvent();
     return OK;
+  }
+
+  /**
+   * One pack onto a receiver: numbered per receiver within the period (the 2nd selection's pack is #2), each entry
+   * pushed into the receiver's eventEntries with its own duration, the one-shot economic deltas applied at once, and
+   * the pack recorded in `this.event.packs` for the public 公示 (who was chosen how often, which packs they got).
+   * @param {import('../PlayerState.js').PlayerState} targetPs
+   * @param {{ kind: 'opp'|'own'|'default', from: string|null, target: string|null, auto?: boolean }} meta
+   * @param {Array<{ id: number, key: string, kind: string }>} cards
+   */
+  _dealPack(targetPs, meta, cards) {
+    const ev = this.event;
+    const list = ev && ev.packs ? ev.packs : null;
+    const prior = (list && list.get(targetPs.playerId)) || [];
+    const pack = prior.length + 1;
+    const entries = [];
+    cards.forEach((card, slot) => {
+      const entryDuration = eventCardDuration(card);
+      targetPs.eventEntries.push({
+        card, duration: entryDuration, mag: 1, from: meta.from, round: this.round,
+        target: meta.target, packKind: meta.kind, pack, slot: slot + 1,
+      });
+      entries.push({ card: card.id, key: card.key, kind: card.kind });
+      // A one-round economic entry (空手而归 −2) has no income window left: R's income settled BEFORE the event period,
+      // and R+1 filters it out by duration. Apply the delta once, right here (user 2026-10-21).
+      if (entryDuration === 1 && Number(card.goldPerRound)) {
+        targetPs.funds = Math.max(0, (Number(targetPs.funds) || 0) + Math.round(Number(card.goldPerRound)));
+      }
+    });
+    targetPs.eventMods = eventModsFor(targetPs.eventEntries, this.round);
+    if (list) {
+      const rec = {
+        kind: meta.kind, from: meta.from ?? null, target: meta.target ?? null,
+        auto: !!meta.auto, pack, entries,
+      };
+      list.set(targetPs.playerId, [...prior, rec]);
+    }
+    return { pack, entries };
   }
 
   /** Every alive seat has picked → the roster hold. */
@@ -485,7 +500,10 @@ export class MatchEvent {
     this.finishEvent();
   }
 
-  /** Close the period (auto-picking whoever is missing), archive it in eventHistory and open the roster hold. */
+  /**
+   * Close the period (auto-picking whoever is missing), deal every unchosen player their 默认包 floor, archive every
+   * entry in eventHistory and open the roster hold.
+   */
   finishEvent() {
     if (this.phase !== PHASE.EVENT || !this.event || this.eventStage === 'roster') return;
     const ev = this.event;
@@ -497,10 +515,25 @@ export class MatchEvent {
       const target = this.botEventTarget(ps);
       if (target) this._eventPick(ps, target, { auto: true });
     }
-    for (const [playerId, rec] of ev.picks) {
-      // rec.card is the card's id (a number); resolve it so the published duration reflects the 1-round economy entries
-      const card = eventCardById(rec.card) || eventCardByKey(rec.key) || null;
-      this.eventHistory.push({ round: ev.round, index: ev.index, playerId, ...rec, duration: eventCardDuration(card) });
+    // the 默认包 floor (0.0.5 需求 1.3, 每人每事件保底): a player selected 0 times gets one pack of 3 中性
+    for (const ps of this.alivePlayers()) {
+      const packs = ev.packs && ev.packs.get ? ev.packs.get(ps.playerId) : null;
+      if (packs && packs.length) continue;
+      const cards = eventDrawPack(this.rngEvent, 'default', this.eventUsedAlly);
+      if (cards.length) this._dealPack(ps, { kind: 'default', from: null, target: null }, cards);
+    }
+    // archive: one history row PER ENTRY (flat, each carrying its 包序 / 包类型 marker), in pack-deal order
+    for (const [receiverId, packs] of (ev.packs || new Map())) {
+      for (const p of packs) {
+        p.entries.forEach((e, i) => {
+          this.eventHistory.push({
+            round: ev.round, index: ev.index, playerId: p.from, target: p.target, targetId: receiverId,
+            card: e.card, key: e.key, kind: e.kind, mag: 1, auto: !!p.auto,
+            duration: eventCardDuration(eventCardById(e.card) || eventCardByKey(e.key)),
+            packKind: p.kind, pack: p.pack, slot: i + 1,
+          });
+        });
+      }
     }
     ev.done = true;
     this._eventDoneRound = this.round;
@@ -550,12 +583,13 @@ export class MatchEvent {
   }
 
   /**
-   * Draw the period's 强力属性 subset: a share from the sequence's eliteShares, one attribute from EVENT_FOE_ELITES, and
-   * `count = max(1, round(share × the carded normal wave's monster count))`. Seeded `rngFoeElite` (share, then attribute);
-   * WHICH units are marked is decided by spawn order at application time (foeEliteSpawns), never by Math.random.
+   * Draw the period's 强力属性 subset: a share from EVENT_FOE_ELITE_SHARES (15 %~20 % in every period since 0.0.5),
+   * one attribute from EVENT_FOE_ELITES, and `count = max(1, round(share × the carded normal wave's monster count))`.
+   * Seeded `rngFoeElite` (share, then attribute); WHICH units are marked is decided by spawn order at application time
+   * (foeEliteSpawns), never by Math.random.
    */
-  _drawFoeElite(sequence = 2) {
-    const shares = sequenceAt(sequence).eliteShares;
+  _drawFoeElite() {
+    const shares = EVENT_FOE_ELITE_SHARES;
     const share = shares[Math.max(0, Math.min(shares.length - 1, Math.floor(this.rngFoeElite() * shares.length)))];
     const attrs = EVENT_FOE_ELITES;
     const attr = attrs[Math.max(0, Math.min(attrs.length - 1, Math.floor(this.rngFoeElite() * attrs.length)))];
@@ -645,21 +679,38 @@ export class MatchEvent {
 
   /**
    * m.public.event — the two public channels:
-   *   ally: the four target maps, each seat's available keys, this period's picks and the whole match's history;
+   *   ally: the four target maps, each seat's available keys, this period's picks + dealt packs (who was chosen how
+   *         many times and which packs they got — 0.0.5 需求 1.5) and the whole match's entry history (one row per
+   *         entry, each carrying its pack marker);
    *   foe:  this period's monster entry (null entry = no draw yet) and every period's monster history.
    * Both are public to BOTH teams by design (the cost entries affect the economy; the monster entry shapes the round).
+   * The 0.0.5 additions (`selected` / `packs`, `packKind` / `pack` / `slot` on the rows) are optional fields: an old
+   * client simply ignores what it does not know.
    */
   eventView() {
     if (!this.huntMode || (!this.event && !this.eventHistory.length && !this.eventFoeHistory.length)) return null;
     const ev = this.event;
     const foe = this.foeEvent;
+    // the period's public pack roster: per receiver, the packs in deal order + how many times they were SELECTED
+    const packs = {};
+    const selected = {};
+    for (const ps of this.order) selected[ps.playerId] = 0;
+    if (ev && ev.packs) {
+      for (const [pid, list] of ev.packs) {
+        packs[pid] = list.map((p) => ({
+          kind: p.kind, from: p.from ?? null, target: p.target ?? null, pack: p.pack, auto: !!p.auto,
+          entries: p.entries.map((e) => ({ card: e.card, key: e.key, kind: e.kind })),
+        }));
+        selected[pid] = list.filter((p) => p.kind !== 'default').length;
+      }
+    }
     return {
       ally: {
         rounds: (this.eventRounds || []).slice(),
         round: ev ? ev.round : null,
-        index: ev ? ev.index : this.eventHistory.length,
+        index: ev ? ev.index : (Number(this.eventIndex) || 0),
         active: this.phase === PHASE.EVENT,
-        // an entry stays in force this many rounds (picked … picked+duration−1); history keeps every pick
+        // an entry stays in force this many rounds (picked … picked+duration−1); history keeps every entry
         duration: EVENT_DURATION_ROUNDS,
         done: !!(ev && ev.done),
         stage: this.eventStage || null,
@@ -668,6 +719,9 @@ export class MatchEvent {
         targets: Object.fromEntries(this.order.map((ps) => [ps.playerId, this.eventTargetIds(ps)])),
         available: Object.fromEntries(this.order.map((ps) => [ps.playerId, this.eventAvailableTargets(ps)])),
         picks: ev ? Object.fromEntries(ev.picks) : {},
+        // 0.0.5 需求 1.5 公示数据: 本次事件谁被选了几次 (selected)、各收什么包 (packs)
+        selected,
+        packs,
         history: this.eventHistory.map((r) => ({ ...r })),
       },
       foe: {

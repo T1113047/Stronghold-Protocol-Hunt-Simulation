@@ -83,7 +83,7 @@ test('ConfrontOverlay: stage roster renders the list (2V2 + coop plans) and hide
   assert.match(s, /function clashRows\(gd, pub, conf, myTeam\)/);
 });
 
-test('EventOverlay: stage roster shows 词条公示 (who gave「X」to whom + effect) and hides the pick UI', () => {
+test('EventOverlay: stage roster shows 词条公示 (who got which pack + its entries) and hides the pick UI', () => {
   const s = src(EVENT);
   const branchAt = s.indexOf("if (ally.stage === 'roster' && ally.roster)");
   const pickUiAt = s.indexOf("cx('evotarget', st.sel && 'is-sel')");
@@ -93,37 +93,41 @@ test('EventOverlay: stage roster shows 词条公示 (who gave「X」to whom + ef
   assert.match(s, /import \{ RosterPanel \} from '\.\/rosterPanel\.js';/);
   assert.match(s, /testid="event-roster" rows=\$\{rosterRows\} until=\$\{Number\(ally\.roster\.until\)/);
   assert.match(s, /export function eventRosterRows\(pub, ally, index\)/);
-  assert.match(s, /filter\(\(r\) => r && Number\(r\.index\) === Number\(index\)\)/);
-  assert.match(s, /const rid = eventReceiver\(rec, targets\);/);
-  assert.match(s, /t\('把「\{card\}」给了', \{ card: name \}\)/);
-  assert.match(s, /allyEffect\(card, Number\(rec\.mag\) \|\| 1\)/);
-  // the receiver helper moved here (one implementation; ui/roundBuffs.js re-exports it)
+  // 0.0.5 需求 1.5: the rows are the period's PACKS — 被选了几次 (selected) + 各收什么包 (packs)
+  assert.match(s, /const packs = \(ally && ally\.packs\) \|\| \{\};/);
+  assert.match(s, /const selected = \(ally && ally\.selected\) \|\| \{\};/);
+  assert.match(s, /const label = t\(PACK_LABEL\[pack\.kind\] \|\| PACK_LABEL\.default\);/);
+  assert.match(s, /t\('被选 \{n\} 次', \{ n: times \}\)/);
+  assert.match(s, /t\('来自 \{name\}', \{ name: pLabel\(from\) \}\)/);
+  // the receiver helper stays here (one implementation; ui/roundBuffs.js re-exports it)
   assert.match(s, /export function eventReceiver\(rec, targets = \{\}\)/);
   inEveryPack('词条公示');
-  inEveryPack('把「{card}」给了');
+  inEveryPack('被选 {n} 次');
+  inEveryPack('来自 {name}');
 });
 
-test('eventRosterRows: this period only, one row per picker, the target map first and targetId as the fallback', () => {
+test('eventRosterRows: one row per pack of this period — the receiver, 被选 n 次, 归属 + 来自, the entries', () => {
   const pub = { players: [
     { playerId: 'a', name: 'A', seat: 0 }, { playerId: 'b', name: 'B', seat: 1 },
   ] };
   const ally = {
     index: 2,
-    targets: { a: { self: 'a', mate: 'b' } },
-    history: [
-      { round: 8, index: 2, playerId: 'a', target: 'mate', targetId: 'b', card: 1, key: 'whetstone', mag: 1 },
-      { round: 8, index: 2, playerId: 'b', target: 'mate', targetId: 'b', card: 2, key: 'tailwind', mag: 1 },
-      { round: 4, index: 1, playerId: 'a', target: 'self', targetId: 'a', card: 1, key: 'whetstone', mag: 2 },
-    ],
+    selected: { a: 1, b: 0 },
+    packs: {
+      a: [{
+        kind: 'opp', from: 'b', target: 'oppA', pack: 1,
+        entries: [{ card: 1, key: 'whetstone', kind: 'up' }, { card: 5, key: 'heavy_crossbow', kind: 'mid' }, { card: 12, key: 'burden_armor', kind: 'mid' }],
+      }],
+      b: [{ kind: 'default', from: null, target: null, pack: 1, entries: [{ card: 2, key: 'tailwind', kind: 'mid' }] }],
+    },
   };
   const rows = eventRosterRows(pub, ally, 2);
-  assert.deepEqual(rows.map((r) => r.key), ['event:a', 'event:b'], 'one row per picker, the earlier period excluded');
-  assert.equal(eventRosterRows(pub, ally, 1).length, 1);
-  // a picker no longer in the target map still resolves through the record's own targetId
-  const gone = eventRosterRows(pub, { index: 2, targets: {}, history: [ally.history[0]] }, 2);
-  assert.equal(gone.length, 1);
+  assert.deepEqual(rows.map((r) => r.key), ['pack:a:1', 'pack:b:1'], 'one row per pack, in seat order');
   // unknown cards are skipped, never guessed
-  assert.equal(eventRosterRows(pub, { index: 2, targets: {}, history: [{ index: 2, playerId: 'a', target: 'self', key: 'nope' }] }, 2).length, 0);
+  const bad = eventRosterRows(pub, { index: 2, selected: { a: 1 }, packs: { a: [{ kind: 'own', from: 'a', pack: 1, entries: [{ key: 'nope' }] }] } }, 2);
+  assert.equal(bad.length, 0);
+  // no packs (an old / empty period) → no rows
+  assert.equal(eventRosterRows(pub, { index: 2, selected: {}, packs: {} }, 2).length, 0);
 });
 
 test('the team panel strip (本回合词条) is independent of the roster stage and survives it', () => {

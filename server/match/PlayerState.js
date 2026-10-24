@@ -261,7 +261,8 @@ export class PlayerState {
      * 2V2 事件期 (server/match/match/event.js): the entries this player RECEIVED — `{ card, mag, from, round, target }` —
      * and the accumulated modifiers they produce (eventModsFor). An entry is in force only for EVENT_DURATION_ROUNDS
      * rounds from its `round`; startRound re-derives eventMods with the current round, and battleInput filters the refs
-     * the same way. `eventTargets` = the target keys this player has already given an entry to (no repeats in one match).
+     * the same way. `eventTargets` = the targets this player has picked so far (a record only since 0.0.5: a target may
+     * be picked repeatedly, every pick sends its pack).
      * The battle side reads eventEntries through battleInput, the economy hooks read eventMods (income / refresh / sell /
      * deploy cap / placed-monster bounty).
      */
@@ -269,7 +270,7 @@ export class PlayerState {
     /** the absolute round the entry windows are evaluated against (set by startRound; eventModsFor / battleInput). */
     this.eventRound = 0;
     this.eventTargets = [];
-    /** the ally entries this player has drawn so far (ids; a card is never drawn twice for one player) */
+    /** the ally entries this player has received so far (ids; a record — the no-repeat pool is match-global, event.js eventUsedAlly) */
     this.eventCards = [];
     this.eventMods = {
       atkPct: 0, aspd: 0, hpPct: 0, defPct: 0, defIgnorePct: 0, regenPct: 0, dmgTakenMul: 1, moveMul: 1, deploy: 0,

@@ -1,8 +1,9 @@
-// 事件期 (PHASE.EVENT) UI, 2026-10-17: the client half of the 2V2 event period — the panel that shows the round's
-// monster entry and 强力属性 BEFORE anyone picks, the four targets (对面 A / 对面 B / 队友 / 自己) with their names and
-// P numbers, the picked-entry result line and the match's three selections. The server rule (three periods, no target
-// twice, 20 s, the AI's auto-pick) lives in server/match/match/event.js and test/match/event.test.js; this file keeps the
-// CLIENT wiring, the testids and the strings.
+// 事件期 (PHASE.EVENT) UI, 2026-10-17 (0.0.5 rework 2026-10-24): the client half of the 2V2 event period — the panel
+// that shows the round's monster entry and 强力属性 BEFORE anyone picks, the four targets (对面 A / 对面 B / 队友 / 自己)
+// with their names and P numbers, the picked-pack result line and the match's three selections. The server rule (three
+// periods, a target repeatable since 0.0.5, one pack per selection, 20 s, the AI's spread auto-pick) lives in
+// server/match/match/event.js and test/match/event.test.js; this file keeps the CLIENT wiring, the testids and the
+// strings.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -91,21 +92,25 @@ test('the round\'s monster entry and 强力属性 come first, before the targets
   // every card of both channels has its msgid mapping
   for (const c of EVENT_CARDS) assert.match(OVERLAY, new RegExp(`${c.key}: N_\\('`), `ally entry ${c.key}`);
   for (const c of EVENT_FOE_CARDS) assert.match(OVERLAY, new RegExp(`${c.key}: N_\\('`), `monster entry ${c.key}`);
-  // the effect lines are rebuilt from the constants (the self magnitude doubles the bonus part only)
-  assert.match(OVERLAY, /t\('攻击力 \{v\}%', \{ v: pct\(card\.atkPct, mag\) \}\)/);
-  assert.match(OVERLAY, /t\('敌人攻击力 ×\{v\}', \{ v: num\(card\.atkMul\) \}\)/);
-  assert.match(OVERLAY, /const scaled = \(base, mag = 1\) => num\(1 \+ \(Number\(base\) - 1\) \* mag\);/);
-  for (const k of ['本回合的怪物词条', '强力属性', '本回合 {share}% 的敌人带「{attr}」', '共 {count} 只']) inEveryPack(k);
+  // 0.0.5 需求 2: every effect line names its subject (「X 的干员」/「X 的敌人」/「双方战场的敌人」)
+  assert.match(OVERLAY, /t\('\{who\}的干员攻击力 \{v\}%', \{ who, v: pct\(card\.atkPct \* mag\) \}\)/);
+  assert.match(OVERLAY, /t\('\{who\}的敌人移动速度 \{v\}%', \{ who, v: pct\(card\.enemySpeed \* mag\) \}\)/);
+  assert.match(OVERLAY, /t\('双方战场的敌人攻击力 ×\{v\}', \{ v: num\(card\.atkMul\) \}\)/);
+  assert.match(OVERLAY, /export function allySubject\(card, who = t\('目标玩家'\)\)/);
+  assert.match(OVERLAY, /const pct = \(ratio\) => signed\(Number\(ratio\) \* 100\);/);
+  for (const k of ['本回合的怪物词条', '强力属性', '本回合 {share}% 的敌人带「{attr}」', '共 {count} 只',
+    '{who}的干员', '{who}的敌人', '目标玩家', '双方战场的敌人']) inEveryPack(k);
 });
 
-test('a used / missing target is greyed out with its reason — the panel never sends a refused pick', () => {
-  // the no-repeat rule is 2V2's: co-op has only self / mate for THREE periods (server event.js eventAvailableTargets)
-  assert.match(OVERLAY, /const wasUsed = versus && used\.has\(key\) && !sel;/);
-  assert.match(OVERLAY, /const usable = available \? available\.has\(key\) : !wasUsed && !!pid;/);
-  assert.match(OVERLAY, /const disabled = !!myPick \|\| busy \|\| dead \|\| !player \|\| wasUsed \|\| !usable;/);
+test('a target may be picked again (0.0.5): the only lock is the one pick per period and the seat\'s own state', () => {
+  // the one-target-per-match limit is gone (server event.js eventAvailableTargets): a used target is never greyed
+  assert.doesNotMatch(OVERLAY, /本局已用过/);
+  assert.doesNotMatch(OVERLAY, /wasUsed/);
+  assert.match(OVERLAY, /const usable = available \? available\.has\(key\) : !!pid;/);
+  assert.match(OVERLAY, /const disabled = !!myPick \|\| busy \|\| dead \|\| !player \|\| !usable;/);
   assert.match(OVERLAY, /disabled=\$\{st\.disabled\}/);
   assert.match(OVERLAY, /aria-disabled=\$\{st\.disabled \? 'true' : 'false'\}/);
-  assert.match(OVERLAY, /if \(wasUsed\) why = t\('本局已用过'\);/);
+  assert.match(OVERLAY, /if \(dead\) why = t\('你已被淘汰'\);/);
   assert.match(OVERLAY, /else if \(!pid\) why = versus \? t\('没有这个座位'\) : t\('没有可选的队友'\);/);
   assert.match(OVERLAY, /else if \(busy\) why = t\('正在提交…'\);/);
   assert.match(OVERLAY, /\$\{st\.why \? html`<span class="evotarget__why">\$\{st\.why\}<\/span>` : null\}/);
@@ -114,7 +119,7 @@ test('a used / missing target is greyed out with its reason — the panel never 
   assert.match(OVERLAY, /class=\$\{cx\('evotarget', st\.sel && 'is-sel'\)\}/);
   assert.match(CSS, /\.evotarget:disabled \{ opacity: \.45; cursor: default; \}/);
   assert.match(CSS, /\.evotarget\.is-sel \{ border-color: var\(--mint-400\);/);
-  for (const k of ['本局已用过', '没有这个座位', '没有可选的队友', '正在提交…', '事件期已结束']) inEveryPack(k);
+  for (const k of ['没有这个座位', '没有可选的队友', '正在提交…', '事件期已结束']) inEveryPack(k);
 });
 
 test('co-op hunt (同盟狩猎) renders only 队友 / 自己 in two columns and keeps both pickable every period', () => {
@@ -124,32 +129,36 @@ test('co-op hunt (同盟狩猎) renders only 队友 / 自己 in two columns and 
   assert.match(OVERLAY, /\$\{targetList\.map\(\(\{ key, label, testid \}\) => \{/);
   assert.match(OVERLAY, /cx\('evov__targets', !versus && 'evov__targets--duo'\)/);
   assert.match(CSS, /\.evov__targets--duo \{ grid-template-columns: repeat\(2, 1fr\); \}/);
-  // no "每个目标一局只能用一次" in co-op: the hint says both stay available
-  assert.match(OVERLAY, /\$\{versus \? t\('自己接收时效果翻倍；每个目标一局只能用一次'\) : t\('自己接收时效果翻倍；自己和队友每次都可以选'\)\}/);
-  inEveryPack('自己接收时效果翻倍；自己和队友每次都可以选');
+  // no 对面包 in co-op: the hint says both targets keep dealing 我方包 and the 默认包 floor stays
+  assert.match(OVERLAY, /\$\{versus \? t\('选对面发对面包（1 减益 \+ 2 中性），选自己或队友发我方包（1 增益 \+ 2 中性）；没被选中的玩家拿默认包（3 中性）'\) : t\('选自己或队友发我方包（1 增益 \+ 2 中性）；没被选中的玩家拿默认包（3 中性）'\)\}/);
+  inEveryPack('选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）');
+  inEveryPack('选对面发对面包（1 减益 + 2 中性），选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）');
 });
 
-test('the picked entry names WHO got it: 你收到了 for self, 送给{目标} + an effect prefix for a mate / opponent', () => {
+test('the picked pack names WHO got it and what it holds: 你收到了 for self, 送给{目标} for a mate / opponent', () => {
   assert.match(OVERLAY, /data-testid="event-result"/);
-  // only `self` reads as "you got it"; the entry lands on the target (server event.js targetPs.eventEntries)
+  // the entry lands on the TARGET (server event.js targetPs.eventEntries): the sentence names the target and the pack
   assert.match(OVERLAY, /const pickedTarget = myPick \? myPick\.target : null;/);
-  assert.match(OVERLAY, /const grantPrefix = pickedTarget === 'self' \|\| !pickedTarget \? null/);
-  assert.match(OVERLAY, /: pickedTarget === 'mate' \? t\('队友获得：'\) : t\('对方获得：'\);/);
-  assert.match(OVERLAY, /t\('已选择 → 你收到了「\{card\}」', \{ card: pickedName \}\)/);
-  assert.match(OVERLAY, /t\('已选择 → 送给\{target\}「\{card\}」', \{ target: pickedTargetLabel, card: pickedName \}\)/);
-  assert.match(OVERLAY, /const pickedEffect = allyEffect\(pickedCard, pickedMag\);/);
-  assert.match(OVERLAY, /<span class="evov__eff">\$\{grantPrefix && pickedEffect \? `\$\{grantPrefix\}\$\{pickedEffect\}` : pickedEffect\}<\/span>/);
-  assert.match(OVERLAY, /const pickedMag = Number\(myPick && myPick\.mag\) \|\| 1;/);
+  assert.match(OVERLAY, /const packKindOf = \(rec\) => \(rec && rec\.packKind\) \|\| \(rec && \(rec\.target === 'oppA' \|\| rec\.target === 'oppB'\) \? 'opp' : 'own'\);/);
+  assert.match(OVERLAY, /const pickedPackLabel = t\(PACK_LABEL\[packKindOf\(myPick\)\] \|\| PACK_LABEL\.own\);/);
+  assert.match(OVERLAY, /t\('已选择 → 你收到了\{pack\}：\{cards\}', \{ pack: pickedPackLabel, cards: pickedNames \}\)/);
+  assert.match(OVERLAY, /t\('已选择 → 送给\{target\}\{pack\}：\{cards\}', \{ target: pickedTargetLabel, pack: pickedPackLabel, cards: pickedNames \}\)/);
+  // every entry of the pack is named and every effect line names its subject (X 的干员 / X 的敌人)
+  assert.match(OVERLAY, /const pickedNames = pickedCards\.map\(\(c\) => `「\$\{t\(ALLY_NAMES\[c\.key\] \|\| c\.key\)\}」`\)\.join\(''\);/);
+  assert.match(OVERLAY, /const pickedEffects = pickedCards\.map\(\(c\) => allyEffect\(c, pickedWho\)\)\.filter\(Boolean\)\.join\(' · '\);/);
+  assert.match(OVERLAY, /\$\{pickedEffects \? html`<span class="evov__eff">\$\{pickedEffects\}<\/span>` : null\}/);
   assert.match(OVERLAY, /data-testid="event-history"/);
   assert.match(OVERLAY, /data-testid="event-history-row"/);
   // one row per period of the match (3), the current one marked, filled from the history or this period's pick
   assert.match(OVERLAY, /const rounds = Array\.isArray\(ally\.rounds\) && ally\.rounds\.length \? ally\.rounds : \[null, null, null\];/);
-  assert.match(OVERLAY, /const rec = history\.find\(\(r\) => r\.index === n\) \|\| \(myPick && index === n \? myPick : null\);/);
+  assert.match(OVERLAY, /const mine = history\.filter\(\(r\) => r\.index === n\);/);
   assert.match(OVERLAY, /<span class="evohist__n">\$\{t\('第 \{n\} 次', \{ n: r\.n \}\)\}<\/span>/);
   assert.match(OVERLAY, /class=\$\{cx\('evohist__row', r\.n === index && 'is-cur'\)\}/);
   assert.match(OVERLAY, /t\('尚未选择'\)/);
   assert.match(CSS, /\.evohist__row\.is-cur \{ border-color: var\(--mint-800\);/);
-  for (const k of ['已选择 → 你收到了「{card}」', '已选择 → 送给{target}「{card}」', '队友获得：', '对方获得：', '已选择，等待其他玩家', '本局选择记录', '第 {n} 次', '尚未选择']) inEveryPack(k);
+  for (const k of ['已选择 → 你收到了{pack}：{cards}', '已选择 → 送给{target}{pack}：{cards}',
+    '已选择，等待其他玩家', '本局选择记录', '第 {n} 次', '尚未选择', '被选 {n} 次', '来自 {name}',
+    '我方包', '对面包', '默认包']) inEveryPack(k);
 });
 
 test('wiring: game.js renders it on PHASE.EVENT, actions.eventPick sends g.event.pick', () => {
@@ -177,7 +186,8 @@ test('the panel is phone-landscape first: it scrolls inside, sizes in var(--t), 
   assert.match(block, /font-size: calc\(\.26 \* var\(--t\)\)/, 'the entry name follows the text scale');
   // every new player-visible string is translated, and the brand name of the inspiration never appears
   for (const k of [
-    '事件期', '第 {n}/{total} 次', '选择这次词条送给谁', '自己接收时效果翻倍；每个目标一局只能用一次',
+    '事件期', '第 {n}/{total} 次', '选择这次词条送给谁',
+    '选对面发对面包（1 减益 + 2 中性），选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）',
     '磨刃', '追风', '破甲', '钝口', '重弩', '连击', '猎人披挂', '营地篝火', '铁衣', '血痕', '轻装远行', '负甲', '陷足',
     '蓄势', '静息', '轻省', '滞涩', '换息', '回环', '猎人佣金', '赏金嗅觉', '轻捷', '空手而归', '集市换货',
     '锈刃', '换骨', '獠牙', '创口', '坚壳', '厚皮', '迟缓', '盘踞', '疾行', '稀疏', '替换', '增援',

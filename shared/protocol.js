@@ -586,9 +586,10 @@ export const C2S = {
   'g.offer': { offerId: isId, pluginId: isId, seq: (v) => isInt(v, 0, 1000000), cardId: optional(isId), idx: (v) => isInt(v, 0, PLUGIN_OFFER_SLOTS - 1) },
   'g.offerRefresh': { offerId: isId, pluginId: isId, seq: (v) => isInt(v, 0, 1000000), cardId: optional(isId), idx: (v) => isInt(v, 0, PLUGIN_OFFER_SLOTS - 1) },
   'g.ready': { ready: isBool },
-  // 2V2 事件期 (EVENT_ROUNDS): this player gives one random entry to one target — self / mate / oppA / oppB. The server
-  // owns the target mapping, the no-repeat rule, the type odds and the seeded card draw (server/match/match/event.js);
-  // an illegal target is ERR.BAD_TARGET, a target already used this match ERR.ALREADY.
+  // 2V2 事件期 (EVENT_ROUNDS): this player gives one entry PACK to one target — self / mate / oppA / oppB. Since 0.0.5
+  // a target may be picked again and by several pickers (every selection deals it another pack). The server owns the
+  // target mapping, the pack composition and the seeded card draw (server/match/match/event.js); an illegal target is
+  // ERR.BAD_TARGET, a second pick in the same period ERR.ALREADY.
   'g.event.pick': { target: (v) => EVENT_TARGETS.includes(v) },
   // 2V2 狩猎期 (confront.js): the team's intervention — ONE 特训敌人 type tab (`group`, 1-based; the official types are
   // data-driven, 7 of them today, so the schema only bounds it loosely and the server clamps) and the placed monsters in
@@ -666,8 +667,10 @@ export const S2C = [
   'm.layer',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
-  // 2V2 事件期: m.event — one resolved ally pick `{ round, index, playerId, target, targetId, card, key, kind, mag, auto }`
-  // or the period's monster draw `{ round, index, foe: { card, key, kind } }` (public: who gave whom / which entry;
+  // 2V2 事件期: m.event — one resolved ally pick `{ round, index, playerId, target, targetId, card, key, kind, mag, auto,
+  // packKind, pack, entries: [{ card, key, kind }] }` (0.0.5: the pick deals a PACK — card/key/kind summarize its first
+  // entry for old clients, entries is the full pack in draw order) or the period's monster draw
+  // `{ round, index, foe: { card, key, kind } }` (public: who gave whom / which entries;
   // the full ally + foe history rides in m.public.event.ally / .foe)
   'm.event',
   // client-side combat (DESIGN §14): b.start { battleId, fieldId, kind, spec, authoritative, startAt, serverNow, elapsed,

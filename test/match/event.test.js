@@ -1,18 +1,19 @@
 // test/match/event.test.js — 2V2 事件期 (类肉鸽词条): the three ordered periods (contest round / +4 / R13), the four
-// targets and the no-repeat rule, the per-sequence type / entry odds, the self ×2 magnitude, every ally entry's effect
-// (battle stats, deploy cap, income, refresh / sell prices, placed-monster bounty, enemy move speed, SP, the environment
-// buff bucket), the independent monster channel (enemy-only mods, 赏金怪 inclusion without repricing, no repeats,
-// per-sequence EV) and the AI / timeout auto-pick / server error codes.
+// targets (repeatable since 0.0.5), the 发包规则 (对面包 / 我方包 / 默认包, one pack per selection), the card-draw
+// no-repeat rule (per kind, match-global bag), every ally entry's effect (battle stats, deploy cap, income, refresh /
+// sell prices, placed-monster bounty, enemy move speed, SP, the environment buff bucket), the independent monster
+// channel (enemy-only mods, 赏金怪 inclusion without repricing, no repeats, unified odds) and the AI / timeout
+// auto-pick / server error codes.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch } from './harness.js';
 import {
-  PHASE, ERR, EVENT_TARGETS, EVENT_CARDS, EVENT_SELF_MUL, EVENT_SEQUENCE, EVENT_ROSTER_MS,
-  EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_DURATION_ROUNDS,
+  PHASE, ERR, EVENT_TARGETS, EVENT_CARDS, EVENT_ROSTER_MS, EVENT_PACK_KINDS, EVENT_PACK_SIZE,
+  EVENT_FOE_ODDS, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_FOE_ELITE_SHARES, EVENT_DURATION_ROUNDS,
 } from '../../shared/constants.js';
 import { validateC2S } from '../../shared/protocol.js';
 import {
-  eventCardById, eventCardByKey, eventKindOf, eventMagnitude, eventModsFor, eventEvFor, eventBattleRefs,
+  eventCardByKey, eventDrawAlly, eventDrawPack, eventModsFor, eventBattleRefs,
   eventEntryActive, eventActiveEntries, eventCardDuration, eventFoeCardById, eventFoeCardByKey, eventFoeKindOf, eventFoeEv,
   eventFoeMeanEv, eventFoeEliteByKey,
 } from '../../server/match/match/event.js';
@@ -45,8 +46,8 @@ function toEvent(h, round) {
 /** Records of one event index. */
 const recordsOf = (m, index) => m.eventHistory.filter((r) => r.index === index);
 
-describe('2V2 事件期: the periods, targets and no-repeat rule', () => {
-  test('three events at the contest round / +4 / R13, one target each, a target cannot repeat (a 4th is impossible)', () => {
+describe('2V2 事件期: the periods, targets and packs', () => {
+  test('three events at the contest round / +4 / R13; a target may repeat and every selection deals one pack', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 20261017, fake: true }).start();
     const m = h.m;
     const p0 = h.ps('p_0');
@@ -66,6 +67,8 @@ describe('2V2 事件期: the periods, targets and no-repeat rule', () => {
     assert.notEqual(m.teamIdOf(h.ps(map.oppA)), m.teamIdOf(p0));
     assert.notEqual(m.teamIdOf(h.ps(map.oppB)), m.teamIdOf(p0));
     assert.equal(m.teamIdOf(h.ps(map.mate)), m.teamIdOf(p0));
+    // 0.0.5: every mapped, living seat stays available every period (the one-target-per-match limit is gone)
+    assert.deepEqual(m.eventAvailableTargets(p0), [...EVENT_TARGETS]);
     // public info: the target maps, the available keys and the deadline are in m.public.event.ally; the monster entry
     // rides in m.public.event.foe (both are public channels)
     const pub = m.publicView();
@@ -79,38 +82,67 @@ describe('2V2 事件期: the periods, targets and no-repeat rule', () => {
 
     assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'self' }), { ok: true });
     assert.deepEqual(p0.eventTargets, ['self']);
-    // the self pick applies at ×2 (whatever entry was drawn)
+    // a self pick deals the receiver (自己) one 我方包: 1 增益 + 2 中性, every entry at its BASE magnitude (no ×2)
     const rec = m.event.picks.get('p_0');
-    assert.equal(rec.mag, EVENT_SELF_MUL);
-    assert.deepEqual(p0.eventMods, eventModsFor([{ card: eventCardById(rec.card), mag: 2 }]));
-    // the pick is public: who gave whom + which entry number
+    assert.equal(rec.mag, 1);
+    assert.equal(rec.packKind, 'own');
+    assert.equal(rec.entries.length, EVENT_PACK_SIZE);
+    assert.deepEqual(rec.entries.map((e) => e.kind), [...EVENT_PACK_KINDS.own]);
+    assert.equal(rec.card, rec.entries[0].card, 'the summary card is the pack\'s distinctive first entry');
+    assert.deepEqual(p0.eventEntries.map((e) => [e.card.id, e.mag]), rec.entries.map((e) => [e.card, 1]));
+    assert.deepEqual(p0.eventMods, eventModsFor(p0.eventEntries, m.round), 'the mods are the pack\'s three entries at base values');
+    // the pick is public: who gave whom, the pack's summary and its full entry list
     const pub2 = m.publicView();
     assert.equal(pub2.event.ally.picks.p_0.card, rec.card);
     assert.equal(pub2.event.ally.picks.p_0.targetId, 'p_0');
+    assert.equal(pub2.event.ally.picks.p_0.packKind, 'own');
+    assert.deepEqual(pub2.event.ally.picks.p_0.entries, rec.entries);
+    // 0.0.5 公示数据: 本次事件谁被选了几次 (selected)、各收什么包 (packs)
+    assert.deepEqual(pub2.event.ally.selected, { p_0: 1, ai_1: 0, ai_2: 0, ai_3: 0 });
+    assert.equal(pub2.event.ally.packs.p_0.length, 1);
+    assert.deepEqual(pub2.event.ally.packs.p_0[0].entries, rec.entries);
+    assert.equal(pub2.event.ally.packs.p_0[0].from, 'p_0');
+    assert.equal(pub2.event.ally.packs.p_0[0].target, 'self');
     const evFrame = h.lastBc('m.event');
     assert.ok(evFrame && evFrame.playerId === 'p_0' && evFrame.target === 'self' && evFrame.card === rec.card);
+    assert.equal(evFrame.packKind, 'own');
+    assert.deepEqual(evFrame.entries, rec.entries);
 
     toEvent(h, rounds[1]);
     assert.equal(m.event.index, 2);
-    // repeated target: refused, the seat stays unpicked
-    assert.equal(m.handle('p_0', { t: 'g.event.pick', target: 'self' }).error, ERR.ALREADY);
-    assert.equal(m.event.picks.has('p_0'), false);
+    // 0.0.5: the same target may be picked again — only ONE pick per player per period is enforced
+    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'self' }), { ok: true });
+    assert.equal(m.event.picks.has('p_0'), true);
     // unknown target: refused
     assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'nope' }), { error: ERR.BAD_TARGET });
     assert.notEqual(validateC2S({ t: 'g.event.pick', target: 'nope' }), null);
     assert.equal(validateC2S({ t: 'g.event.pick', target: 'mate' }), null);
-    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'mate' }), { ok: true });
+    // a second pick in the same period is still refused
+    assert.equal(m.handle('p_0', { t: 'g.event.pick', target: 'mate' }).error, ERR.ALREADY);
 
     toEvent(h, rounds[2]);
     assert.equal(m.event.index, 3);
+    const ai2Before = h.ps('ai_2').eventEntries.length;
     assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'oppA' }), { ok: true });
+    // an oppA pick deals the TARGET (the chosen opponent) one 对面包: 1 减益 + 2 中性
+    const oppRec = m.event.picks.get('p_0');
+    assert.equal(oppRec.packKind, 'opp');
+    assert.deepEqual(oppRec.entries.map((e) => e.kind), [...EVENT_PACK_KINDS.opp]);
+    assert.equal(oppRec.targetId, 'ai_2', 'the pack lands on the chosen opponent');
+    assert.equal(h.ps('ai_2').eventEntries.length, ai2Before + EVENT_PACK_SIZE, 'the target received exactly one pack now');
     // let the bots take their picks and close the period
     assert.ok(h.run(() => m.phase !== PHASE.EVENT));
 
-    // exactly three events, three distinct targets for the human, and no event period ever again
+    // exactly three events, every entry archived, and no event period ever again
     assert.ok(recordsOf(m, 1).length > 0 && recordsOf(m, 2).length > 0 && recordsOf(m, 3).length > 0);
-    assert.deepEqual(p0.eventTargets, ['self', 'mate', 'oppA']);
-    assert.equal(new Set(p0.eventTargets).size, 3);
+    for (const index of [1, 2, 3]) {
+      for (const r of recordsOf(m, index)) {
+        assert.ok(['own', 'opp', 'default'].includes(r.packKind), `row packKind ${r.packKind}`);
+        assert.ok(r.pack >= 1 && r.slot >= 1 && r.slot <= EVENT_PACK_SIZE, '包序 / slot markers');
+        assert.equal(r.mag, 1, 'no magnitude multiplier any more');
+      }
+    }
+    assert.deepEqual(p0.eventTargets, ['self', 'self', 'oppA'], 'a target may repeat across periods');
     assert.equal(m.eventIndex, 3);
     p0.autoplay = true;
     const ok = h.drive(() => m.round >= 14 || h.ended != null);
@@ -120,6 +152,42 @@ describe('2V2 事件期: the periods, targets and no-repeat rule', () => {
 
     // err code for a pick outside the phase
     if (h.ended == null) assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'oppB' }), { error: ERR.WRONG_PHASE });
+  });
+
+  test('the 发包规则: N selections → N packs (对面 + 我方 mixed), and the 默认包 floor for the unchosen', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 20261024, fake: true }).start();
+    const m = h.m;
+    toEvent(h, m.eventRounds[0]);
+    // deterministic picks (before the bots' scheduled auto-picks run): ai_2 is selected TWICE (once per side — one
+    // 对面包 + one 我方包), ai_1 is never selected and must get the 默认包 floor at the period's close.
+    assert.deepEqual(m._eventPick(h.ps('p_0'), 'self'), { ok: true });      // → p_0  (我方包)
+    assert.deepEqual(m._eventPick(h.ps('ai_1'), 'oppA'), { ok: true });     // → ai_2 (对面包)
+    assert.deepEqual(m._eventPick(h.ps('ai_2'), 'mate'), { ok: true });     // → ai_3 (我方包)
+    assert.deepEqual(m._eventPick(h.ps('ai_3'), 'mate'), { ok: true });     // → ai_2 (我方包, second pack)
+    // every alive seat answered → the period closes at once (roster hold), the floor lands immediately
+    assert.equal(m.event.done, true);
+    const packs = m.event.packs;
+    assert.equal(packs.get('ai_2').length, 2, '被选中 N 次 → N 个包');
+    assert.deepEqual(packs.get('ai_2').map((p) => p.kind), ['opp', 'own'], '对面 + 我方混合被选 = 两类包都收');
+    assert.equal(packs.get('ai_1').length, 1);
+    assert.equal(packs.get('ai_1')[0].kind, 'default', '未被选中 → 1 个默认包');
+    assert.deepEqual(packs.get('ai_1')[0].entries.map((e) => e.kind), [...EVENT_PACK_KINDS.default]);
+    assert.equal(packs.get('ai_1')[0].from, null, 'a default pack has no picker');
+    // the entries all landed on the receiver
+    for (const pid of ['p_0', 'ai_1', 'ai_2', 'ai_3']) {
+      const total = packs.get(pid).reduce((n, p) => n + p.entries.length, 0);
+      assert.equal(h.ps(pid).eventEntries.length, total, `${pid} received every entry of its packs`);
+    }
+    // the public 公示 data says exactly that
+    const pub = m.publicView();
+    assert.deepEqual(pub.event.ally.selected, { p_0: 1, ai_1: 0, ai_2: 2, ai_3: 1 });
+    assert.equal(pub.event.ally.packs.ai_2.length, 2);
+    assert.deepEqual(pub.event.ally.packs.ai_2.map((p) => p.entries.length), [EVENT_PACK_SIZE, EVENT_PACK_SIZE]);
+    // the archived history is one row per entry, each with its pack marker
+    const rows = recordsOf(m, 1);
+    assert.equal(rows.length, 5 * EVENT_PACK_SIZE, '5 packs × 3 entries = 15 rows');
+    assert.deepEqual(rows.filter((r) => r.packKind === 'default').map((r) => r.targetId), ['ai_1', 'ai_1', 'ai_1']);
+    assert.deepEqual(rows.filter((r) => r.targetId === 'ai_2').map((r) => r.packKind), ['opp', 'opp', 'opp', 'own', 'own', 'own']);
   });
 
   test('an event period never runs without a hunt (solo / co-op with COOP_HUNT off)', () => {
@@ -153,65 +221,68 @@ describe('2V2 事件期: the periods, targets and no-repeat rule', () => {
     assert.equal(m.eventIndex, 3);
   });
 
-  test('the drawn type follows the per-sequence odds (E1 / E2 / E3, seeded large sample)', () => {
-    assert.deepEqual(EVENT_SEQUENCE.map((r) => r.allyOdds), [
-      { down: 15, mid: 45, up: 40 },
-      { down: 30, mid: 40, up: 30 },
-      { down: 45, mid: 30, up: 25 },
-    ]);
-    assert.deepEqual(EVENT_SEQUENCE.map((r) => r.foeOdds), [
-      { favor: 35, mid: 40, unfavor: 25 },
-      { favor: 25, mid: 40, unfavor: 35 },
-      { favor: 20, mid: 35, unfavor: 45 },
-    ]);
-    assert.deepEqual(EVENT_SEQUENCE.map((r) => r.eliteShares), [[0.10, 0.15], [0.15, 0.20], [0.20, 0.25]]);
+  test('unified odds (0.0.5): one foe row for all periods, fixed pack shapes, kind-scoped no-repeat draws', () => {
+    // the per-sequence tables are gone: EVENT_FOE_ODDS / EVENT_FOE_ELITE_SHARES are the single source
+    assert.deepEqual(EVENT_FOE_ODDS, { favor: 25, mid: 40, unfavor: 35 });
+    assert.deepEqual([...EVENT_FOE_ELITE_SHARES], [0.15, 0.20]);
+    assert.deepEqual([...EVENT_PACK_KINDS.opp], ['down', 'mid', 'mid'], '对面包: 1 减益 + 2 中性');
+    assert.deepEqual([...EVENT_PACK_KINDS.own], ['up', 'mid', 'mid'], '我方包: 1 增益 + 2 中性');
+    assert.deepEqual([...EVENT_PACK_KINDS.default], ['mid', 'mid', 'mid'], '默认包: 3 中性');
+    for (const kinds of Object.values(EVENT_PACK_KINDS)) assert.equal(kinds.length, EVENT_PACK_SIZE);
+    // the monster kind draw follows the unified odds (seeded large sample)
     const rng = createRng(0x5eed2026);
     const n = 200000;
-    for (const [i, row] of EVENT_SEQUENCE.entries()) {
-      const seq = i + 1;
-      const ally = { down: 0, mid: 0, up: 0 };
-      const foe = { favor: 0, mid: 0, unfavor: 0 };
-      for (let k = 0; k < n; k++) {
-        ally[eventKindOf(rng, 'self', seq)]++;
-        foe[eventFoeKindOf(rng, seq)]++;
-      }
-      for (const kind of ['down', 'mid', 'up']) {
-        assert.ok(Math.abs(ally[kind] / n - row.allyOdds[kind] / 100) < 0.005, `E${seq} ally ${kind}`);
-      }
-      for (const kind of ['favor', 'mid', 'unfavor']) {
-        assert.ok(Math.abs(foe[kind] / n - row.foeOdds[kind] / 100) < 0.005, `E${seq} foe ${kind}`);
-      }
+    const foe = { favor: 0, mid: 0, unfavor: 0 };
+    for (let k = 0; k < n; k++) foe[eventFoeKindOf(rng)]++;
+    for (const kind of ['favor', 'mid', 'unfavor']) {
+      assert.ok(Math.abs(foe[kind] / n - EVENT_FOE_ODDS[kind] / 100) < 0.005, `foe ${kind}`);
     }
-    // monster-channel EV per sequence: E1 +0.10, E2 −0.10, E3 −0.25
-    assert.ok(Math.abs(eventFoeEv(1) - 0.10) < 1e-12);
-    assert.ok(Math.abs(eventFoeEv(2) + 0.10) < 1e-12);
-    assert.ok(Math.abs(eventFoeEv(3) + 0.25) < 1e-12);
+    // monster-channel EV: exactly −0.10 in every period now
+    assert.ok(Math.abs(eventFoeEv() + 0.10) < 1e-12);
   });
 
-  test('self doubles every magnitude (and only self)', () => {
-    assert.equal(EVENT_SELF_MUL, 2);
-    assert.equal(eventMagnitude('self'), 2);
-    for (const t of ['mate', 'oppA', 'oppB']) assert.equal(eventMagnitude(t), 1);
-    for (const card of EVENT_CARDS) {
-      const one = eventModsFor([{ card, mag: 1 }]);
-      const two = eventModsFor([{ card, mag: 2 }]);
-      for (const key of [
-        'atkPct', 'aspd', 'hpPct', 'defPct', 'defIgnorePct', 'regenPct', 'deploy',
-        'spRecoveryFlat', 'spCostFlat', 'goldPerRound', 'bountyGold', 'refreshDiscount', 'refreshUses', 'sellDiscount',
-      ]) {
-        assert.ok(Math.abs(two[key] - one[key] * 2) < 1e-12, `${card.key}.${key}: ${one[key]} → ${two[key]}`);
-      }
-      // multiplicative magnitudes double the BONUS part: 8 % taken → 16 %, 15 % speed → 30 %, 0.9 move → 0.8
-      for (const key of ['dmgTakenMul', 'enemySpeedMul', 'moveMul', 'spRecoveryMul']) {
-        assert.ok(Math.abs(two[key] - (1 + (one[key] - 1) * 2)) < 1e-12, `${card.key}.${key}`);
-      }
+  test('the card draw: unused-of-kind first, the kind repeats only after ITS pool is exhausted (match-global bag)', () => {
+    const downIds = EVENT_CARDS.filter((c) => c.kind === 'down').map((c) => c.id).sort((a, b) => a - b);
+    assert.equal(downIds.length, 5, 'the down pool');
+    const used = new Set();
+    const draws = [];
+    const rng = createRng(0xc0ffee);
+    for (let i = 0; i < 12; i++) {
+      const c = eventDrawAlly(rng, 'down', used);
+      assert.ok(c, 'a draw always resolves');
+      used.add(c.id);
+      draws.push(c);
     }
-    // the calibrated values themselves (×1.5 magnitudes; self ×2 on top)
-    assert.ok(Math.abs(eventModsFor([{ card: C('whetstone'), mag: 2 }]).atkPct - 0.40) < 1e-12);
-    assert.ok(Math.abs(eventModsFor([{ card: C('bloodstain'), mag: 2 }]).dmgTakenMul - 1.24) < 1e-12);
-    assert.ok(Math.abs(eventModsFor([{ card: C('mired'), mag: 2 }]).enemySpeedMul - 1.44) < 1e-12);
-    assert.ok(Math.abs(eventModsFor([{ card: C('burden_armor'), mag: 2 }]).moveMul - 0.70) < 1e-12);
-    assert.ok(Math.abs(eventModsFor([{ card: C('breath_swap'), mag: 2 }]).spRecoveryMul - 1.44) < 1e-12);
+    assert.ok(draws.every((c) => c.kind === 'down'), 'a draw never leaves its kind');
+    assert.deepEqual([...new Set(draws.slice(0, 5).map((c) => c.id))].sort((a, b) => a - b), downIds,
+      'the first draws cover the kind pool with no repeats');
+    assert.equal(used.size, downIds.length, 'the match-global bag holds each down card once');
+    // once the kind is exhausted the draw repeats INSIDE the kind (down only has 5 cards — expected)
+    assert.ok(draws.slice(5).every((c) => downIds.includes(c.id)), 'exhausted kind repeats within itself');
+    // a cross-kind draw still prefers its own unused cards even though `down` is exhausted
+    const up = eventDrawAlly(rng, 'up', used);
+    assert.equal(up.kind, 'up');
+    assert.equal(used.has(up.id), false);
+    // a pack marks every card it draws and keeps the composition order (distinctive card first)
+    const usedPack = new Set();
+    const pack = eventDrawPack(createRng(7), 'opp', usedPack);
+    assert.equal(pack.length, EVENT_PACK_SIZE);
+    assert.deepEqual(pack.map((c) => c.kind), [...EVENT_PACK_KINDS.opp]);
+    assert.equal(usedPack.size, EVENT_PACK_SIZE);
+    assert.equal(EVENT_CARDS.length, 24, 'the 24-entry pool');
+  });
+
+  test('every entry applies at its BASE magnitude (the 自己 ×2 multiplier is gone)', () => {
+    // the calibrated values themselves (×1.5 magnitudes, no target multiplier any more)
+    assert.ok(Math.abs(eventModsFor([{ card: C('whetstone') }]).atkPct - 0.20) < 1e-12);
+    assert.ok(Math.abs(eventModsFor([{ card: C('bloodstain') }]).dmgTakenMul - 1.12) < 1e-12);
+    assert.ok(Math.abs(eventModsFor([{ card: C('mired') }]).enemySpeedMul - 1.22) < 1e-12);
+    assert.ok(Math.abs(eventModsFor([{ card: C('burden_armor') }]).moveMul - 0.85) < 1e-12);
+    assert.ok(Math.abs(eventModsFor([{ card: C('breath_swap') }]).spRecoveryMul - 1.22) < 1e-12);
+    // stacking two copies still multiplies in the environment bucket (1.20 × 1.20), never doubles the bonus
+    const twice = eventModsFor([{ card: C('whetstone') }, { card: C('whetstone') }]);
+    assert.ok(Math.abs(twice.atkPct - 0.40) < 1e-12, 'the additive part adds up');
+    assert.ok(Math.abs(eventModsFor([{ card: C('mired') }, { card: C('mired') }]).enemySpeedMul - 1.22 * 1.22) < 1e-12);
   });
 
   test('every ally entry feeds at least one modifier (a table-driven coverage check)', () => {
@@ -369,7 +440,7 @@ describe('2V2 事件期: every entry actually applies', () => {
     assert.equal(ps.deployCap, base + 1);
   });
 
-  test('猎人佣金 / 空手而归: +3 / −2 gold each round (and ×2 on self)', () => {
+  test('猎人佣金 / 空手而归: +3 / −2 gold each round at BASE magnitude (no target multiplier)', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 4, fake: true }).start();
     const ps = h.ps('p_0');
     ps.eventEntries = [{ card: C('hunter_commission'), mag: 1 }];
@@ -384,7 +455,8 @@ describe('2V2 事件期: every entry actually applies', () => {
     ps.startRound(6);
     assert.equal(ps.funds, Math.max(0, ps.gd.income(6) - 2));
 
-    ps.eventEntries = [{ card: C('hunter_commission'), mag: 2 }];
+    // two received copies stack additively (+6) — there is no "选自己 ×2" any more, only more packs
+    ps.eventEntries = [{ card: C('hunter_commission'), mag: 1 }, { card: C('hunter_commission'), mag: 1 }];
     ps.eventMods = eventModsFor(ps.eventEntries);
     ps.funds = 0;
     ps.startRound(7);
@@ -474,11 +546,12 @@ describe('2V2 事件期: the monster channel', () => {
     const pub = m.publicView();
     assert.equal(pub.event.foe.card, a.before);
     assert.ok(pub.event.foe.history.some((r) => r.index === 1 && r.card === a.before));
-    // never in the player's mods (the ally entry is the only one there)
-    assert.equal(p0.eventEntries.length, 1);
-    assert.equal(p0.eventEntries[0].card.class === 'output' || p0.eventEntries[0].card.class === 'survival'
-      || p0.eventEntries[0].card.class === 'sp' || p0.eventEntries[0].card.class === 'economy', true);
-    assert.equal(Object.hasOwn(p0.eventEntries[0].card, 'hpMul'), false);
+    // never in the player's mods (only the ally PACK's entries land there)
+    assert.equal(p0.eventEntries.length, EVENT_PACK_SIZE);
+    for (const e of p0.eventEntries) {
+      assert.ok(['output', 'survival', 'sp', 'economy'].includes(e.card.class), `ally class ${e.card.class}`);
+      assert.equal(Object.hasOwn(e.card, 'hpMul'), false, 'a monster entry never reaches a player\'s mods');
+    }
 
     // the spawn merge: a copy, the input untouched, multipliers composed, count shifted
     const card = m.foeEvent.card;
@@ -499,14 +572,14 @@ describe('2V2 事件期: the monster channel', () => {
     m.round = m.foeEvent.round;
   });
 
-  test('the monster pool: 4 classes × 3 (favor / mid / unfavor), E2 25/40/35 draws, EV −0.10, no repeats', () => {
+  test('the monster pool: 4 classes × 3 (favor / mid / unfavor), unified 25/40/35 draws, EV −0.10, no repeats', () => {
     assert.equal(EVENT_FOE_CARDS.length, 12);
     for (const cls of ['attack', 'survival', 'speed', 'count']) {
       const list = EVENT_FOE_CARDS.filter((c) => c.class === cls);
       assert.equal(list.length, 3, cls);
       assert.deepEqual(list.map((c) => c.kind).sort(), ['favor', 'mid', 'unfavor'], cls);
     }
-    assert.deepEqual(EVENT_SEQUENCE[1].foeOdds, { favor: 25, mid: 40, unfavor: 35 });
+    assert.deepEqual(EVENT_FOE_ODDS, { favor: 25, mid: 40, unfavor: 35 });
     // EV: +1 / 0 / −1 over 25 / 40 / 35 = −0.10 per event
     assert.ok(Math.abs(eventFoeMeanEv('favor') - 1) < 1e-12);
     assert.ok(Math.abs(eventFoeMeanEv('mid')) < 1e-12);
@@ -517,18 +590,28 @@ describe('2V2 事件期: the monster channel', () => {
     const count = { favor: 0, mid: 0, unfavor: 0 };
     for (let i = 0; i < n; i++) count[eventFoeKindOf(rng)]++;
     for (const kind of ['favor', 'mid', 'unfavor']) {
-      const want = EVENT_SEQUENCE[1].foeOdds[kind] / 100;
+      const want = EVENT_FOE_ODDS[kind] / 100;
       assert.ok(Math.abs(count[kind] / n - want) < 0.005, `${kind}: ${count[kind] / n} vs ${want}`);
     }
-    // three periods → three distinct monster entries (the pool is never repeated)
+    // three periods → three distinct monster entries (the monster pool never repeats inside one match)
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: botSeats(), seed: 23, fake: true }).start();
     const m = h.m;
     assert.ok(h.run(() => m.round >= 14 || h.ended != null, { maxSteps: 3e6 }));
     assert.equal(m.eventFoeHistory.length, 3);
     assert.equal(new Set(m.eventFoeHistory.map((r) => r.card)).size, 3);
-    // and no player saw the same ally entry twice, nor the match itself (24 cards, at most 12 ally draws)
-    assert.equal(m.eventUsedAlly.size, m.eventHistory.length, 'the ally pool never repeats within one match');
-    for (const ps of m.players.values()) assert.equal(new Set(ps.eventCards).size, ps.eventCards.length);
+    // 0.0.5 重复规则: a card repeats only after its KIND's pool is exhausted (the used bag is match-global)
+    assert.ok(m.eventUsedAlly.size <= EVENT_CARDS.length);
+    const drawnByKind = { down: [], mid: [], up: [] };
+    for (const r of m.eventHistory) drawnByKind[r.kind].push(r.card);
+    for (const kind of ['down', 'mid', 'up']) {
+      const pool = EVENT_CARDS.filter((c) => c.kind === kind);
+      const ids = drawnByKind[kind];
+      const distinct = new Set(ids);
+      assert.ok([...distinct].every((id) => pool.some((c) => c.id === id)), `${kind}: never borrows another kind's card`);
+      if (ids.length > distinct.size) {
+        assert.equal(distinct.size, pool.length, `${kind}: repeats only after its ${pool.length}-card pool is exhausted`);
+      }
+    }
     // a known monster entry round-trips by key and id (×1.5 values)
     assert.equal(eventFoeCardByKey('fangs').id, eventFoeCardById(3).id);
     assert.equal(eventFoeCardByKey('fangs').atkMul, 1.15);
@@ -540,14 +623,14 @@ describe('2V2 事件期: the monster channel', () => {
     assert.equal(eventFoeCardByKey('replace').hpMul, 1.3);
   });
 
-  test('the 强力属性 subset: per-sequence share, count formula, 赏金怪 included but never repriced', () => {
+  test('the 强力属性 subset: unified 15 %~20 % share, count formula, 赏金怪 included but never repriced', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 31, fake: true }).start();
     toEvent(h, h.m.eventRounds[0]);
     const m = h.m;
     const elite = m.foeEvent.elite;
-    assert.ok(EVENT_SEQUENCE[0].eliteShares.includes(elite.share), `E1 share ${elite.share}`);
+    assert.ok(EVENT_FOE_ELITE_SHARES.includes(elite.share), `E1 share ${elite.share}`);
     assert.ok(EVENT_FOE_ELITES.some((a) => a.key === elite.attr), `attr ${elite.attr}`);
-    assert.ok(elite.share >= 0.10 && elite.share <= 0.15);
+    assert.ok(elite.share >= 0.15 && elite.share <= 0.20, 'the unified 15 %~20 % range in every period');
     // the public count is based on the CARDED match-wide wave (the monster entry applies first)
     const carded = m.foeEventSpawns(m.wave.spawns);
     const total = carded.reduce((n, s) => n + Math.max(1, Math.trunc(Number(s.count) || 1)), 0);
@@ -627,7 +710,7 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     assert.equal(eventEntryActive(entry, 8), true);
     assert.equal(eventEntryActive(entry, 9), false);
     assert.equal(eventModsFor([entry], 8).goldPerRound, -2);
-    assert.equal(eventModsFor([{ ...entry, mag: 2 }], 8).goldPerRound, -4, 'self doubles the −2');
+    assert.equal(eventModsFor([entry, entry], 8).goldPerRound, -4, 'two received copies stack (no target multiplier any more)');
     assert.equal(eventModsFor([entry], 9).goldPerRound, 0);
     // a normal entry still lasts the full 4 rounds
     assert.equal(eventCardDuration(C('whetstone')), EVENT_DURATION_ROUNDS);
@@ -657,25 +740,26 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     assert.equal(ps.eventEntries.length, 2, 'the records themselves are kept (history, not "currently in force")');
   });
 
-  test('a one-round economic entry lands immediately: 空手而归 −2 (self ×2) is applied once, not as a per-round window', () => {
+  test('a one-round economic entry lands immediately: 空手而归 −2 is applied once at pick time, not as a per-round window', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 77, fake: true }).start();
     const m = h.m;
     toEvent(h, m.eventRounds[0]);
-    const p0 = h.ps('p_0');
-    // force the roll: kind = 'down' (15 %) and the first unused card of that kind = 空手而归 (the only one left)
+    const target = h.ps('ai_2'); // a 对面包 lands on the chosen opponent
+    // force the roll: the down slot's only unused card is 空手而归 (a 对面包 draws its 减益 first)
     for (const c of EVENT_CARDS) if (c.kind === 'down' && c.id !== 23) m.eventUsedAlly.add(c.id);
     m.rngEvent = () => 0.01;
-    p0.funds = 10;
-    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'self' }), { ok: true });
+    target.funds = 10;
+    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'oppA' }), { ok: true });
     const rec = m.event.picks.get('p_0');
-    assert.equal(rec.key, 'empty_handed', 'the forced roll drew 空手而归');
-    // the round's income was settled BEFORE the event period, so the −4 (self ×2) is applied at pick time
-    assert.equal(p0.funds, 6, '−4 gold (−2 × self ×2) applied once, right now');
-    assert.equal(p0.eventMods.goldPerRound, -4, 'the window still carries it for the battle/refs side');
+    assert.equal(rec.packKind, 'opp');
+    assert.equal(rec.entries[0].key, 'empty_handed', 'the forced roll drew 空手而归 as the pack\'s 减益');
+    // the round's income was settled BEFORE the event period, so the −2 is applied at pick time — once (no ×2 any more)
+    assert.equal(target.funds, 8, '−2 gold applied once, right now');
+    assert.equal(target.eventMods.goldPerRound, -2, 'the window still carries it for the battle/refs side');
     // R+1 must NOT deduct again (duration 1): base income only
-    p0.funds = 0;
-    p0.startRound(m.eventRounds[0] + 1);
-    assert.equal(p0.funds, p0.gd.income(m.eventRounds[0] + 1), 'no second deduction at the next round');
+    target.funds = 0;
+    target.startRound(m.eventRounds[0] + 1);
+    assert.equal(target.funds, target.gd.income(m.eventRounds[0] + 1), 'no second deduction at the next round');
   });
 
   test('the published history carries the card-specific duration (经济负面 = 1, not 4)', () => {
@@ -684,16 +768,16 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     toEvent(h, m.eventRounds[0]);
     for (const c of EVENT_CARDS) if (c.kind === 'down' && c.id !== 23) m.eventUsedAlly.add(c.id);
     m.rngEvent = () => 0.01;
-    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'self' }), { ok: true });
-    assert.equal(m.event.picks.get('p_0').key, 'empty_handed');
+    assert.deepEqual(m.handle('p_0', { t: 'g.event.pick', target: 'oppA' }), { ok: true });
+    assert.equal(m.event.picks.get('p_0').entries[0].key, 'empty_handed');
     // everyone else is picked by the timeout, then the roster hold archives the history
     h.run(() => m.phase !== PHASE.EVENT || h.ended != null, { maxSteps: 3e6 });
-    const rec = m.eventHistory.find((r) => r.playerId === 'p_0');
-    assert.ok(rec, 'the pick is archived');
+    const rec = m.eventHistory.find((r) => r.key === 'empty_handed');
+    assert.ok(rec, 'the entry row is archived');
     assert.equal(rec.duration, 1, 'the published duration is the card\'s, not the 4-round default');
     assert.equal(eventCardDuration(C(rec.key)), 1);
     const view = m.eventView();
-    const pubRec = view.ally.history.find((r) => r.playerId === 'p_0');
+    const pubRec = view.ally.history.find((r) => r.key === 'empty_handed');
     assert.equal(pubRec.duration, 1, 'm.public carries it too');
   });
 
@@ -750,7 +834,8 @@ describe('2V2 事件期: an ally entry lasts EVENT_DURATION_ROUNDS rounds', () =
     assert.equal(pub.event.ally.duration, EVENT_DURATION_ROUNDS);
     const rec = pub.event.ally.history.find((r) => r.playerId === 'p_0');
     assert.equal(rec.round, m.eventRounds[0], 'the pick keeps its round');
-    assert.equal(pub.event.ally.history.length, m.alivePlayers().length, 'the full record is still public');
+    // one history row per ENTRY (3 per pack); every seat was selected, so there are no default packs here
+    assert.equal(pub.event.ally.history.length, EVENT_PACK_SIZE * m.alivePlayers().length, 'the full record is still public');
   });
 });
 
@@ -771,7 +856,7 @@ describe('2V2 事件期: roster hold', () => {
     assert.equal(pub.event.ally.stage, 'roster');
     assert.deepEqual(pub.event.ally.roster, { until, ms: EVENT_ROSTER_MS });
     assert.equal(pub.event.ally.roster.ms, 5000);
-    assert.equal(pub.event.ally.history.length, m.alivePlayers().length, 'every pick is archived');
+    assert.equal(pub.event.ally.history.length, EVENT_PACK_SIZE * m.alivePlayers().length, 'every entry is archived');
     assert.equal(Object.keys(pub.event.ally.picks).length, m.alivePlayers().length);
     // idempotent: a second call does not replace or stack the timer
     assert.equal(m.enterEventRoster(), false);
@@ -810,7 +895,7 @@ describe('2V2 事件期: roster hold', () => {
     assert.equal(m.eventStage, 'roster');
     const pub = m.publicView();
     assert.equal(pub.event.ally.roster.ms, EVENT_ROSTER_MS);
-    assert.equal(pub.event.ally.history.length, m.alivePlayers().length);
+    assert.equal(pub.event.ally.history.length, EVENT_PACK_SIZE * m.alivePlayers().length);
     assert.ok(pub.event.ally.history.some((r) => r.playerId === 'p_0' && r.auto === true), 'the AI fill is public');
     h.sched.advance(4999);
     assert.equal(m.phase, PHASE.EVENT);
@@ -820,32 +905,42 @@ describe('2V2 事件期: roster hold', () => {
 });
 
 describe('2V2 事件期: AI, timeout and server authority', () => {
-  test('AI seats pick the highest EV target at once (and never stall the phase)', () => {
+  test('AI seats spread the packs over the un-chosen 对面 seats, then 自己 (0.0.5; 超时同 AI)', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: botSeats(), seed: 11, fake: true }).start();
+    const m = h.m;
+    toEvent(h, m.eventRounds[0]);
+    // four bots, two per team: each team spreads its packs over the OTHER team's two seats (多名 bot 分散)
+    const ps = ['p_0', 'p_1', 'p_2', 'p_3'].map((id) => h.ps(id));
+    assert.equal(m.botEventTarget(ps[0]), 'oppA', 'first: an un-chosen 对面 seat');
+    assert.deepEqual(m._eventPick(ps[0], m.botEventTarget(ps[0])), { ok: true });
+    assert.equal(m.botEventTarget(ps[1]), 'oppB', 'the second bot spreads to the other 对面 seat');
+    assert.deepEqual(m._eventPick(ps[1], m.botEventTarget(ps[1])), { ok: true });
+    assert.equal(m.botEventTarget(ps[2]), 'oppA', 'the other team targets ITS own opponents');
+    assert.deepEqual(m._eventPick(ps[2], m.botEventTarget(ps[2])), { ok: true });
+    assert.equal(m.botEventTarget(ps[3]), 'oppB');
+    assert.deepEqual(m._eventPick(ps[3], m.botEventTarget(ps[3])), { ok: true });
+    // every 对面 seat is taken this round → the fallback is 自己 (mate is never a bot's choice)
+    assert.equal(m.botEventTarget(ps[0]), 'self');
+    // the four picks dealt four 对面包 (1 减益 + 2 中性 each) — one per selection, no discount for bots
+    for (const p of ps) {
+      const rec = [...m.event.picks.values()].find((r) => r.targetId === p.playerId);
+      assert.equal(rec.packKind, 'opp', `${p.playerId} got a 对面包`);
+    }
+  });
+
+  test('a full bot match runs all three periods without stalling (unified elite share in each)', () => {
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: botSeats(), seed: 11, fake: true }).start();
     const m = h.m;
     const ok = h.run(() => m.round >= 14 || h.ended != null, { maxSteps: 3e6 });
     assert.ok(ok);
-    // three periods ran (each event index has one record per seat still alive at that time)
+    // three periods ran (each event index has entries for every seat still alive at that time)
     assert.equal(new Set(m.eventHistory.map((r) => r.index)).size, 3);
-    // the EV order moves with the sequence: E1/E2 self > mate > opp; E3 opp > mate > self
-    assert.ok(eventEvFor('self', 1) > eventEvFor('mate', 1));
-    assert.ok(eventEvFor('mate', 1) > eventEvFor('oppA', 1));
-    assert.ok(eventEvFor('self', 2) > eventEvFor('mate', 2));
-    assert.ok(eventEvFor('mate', 2) > eventEvFor('oppA', 2));
-    assert.ok(eventEvFor('oppA', 3) > eventEvFor('mate', 3));
-    assert.ok(eventEvFor('mate', 3) > eventEvFor('self', 3));
     for (const index of [1, 2, 3]) {
       const recs = recordsOf(m, index);
-      assert.ok(recs.length > 0, `event #${index} has picks`);
-      for (const r of recs) {
-        const prior = m.eventHistory.filter((x) => x.playerId === r.playerId && x.index < index).map((x) => x.target);
-        const avail = EVENT_TARGETS.filter((t) => !prior.includes(t));
-        const best = Math.max(...avail.map((t) => eventEvFor(t, index)));
-        assert.ok(Math.abs(eventEvFor(r.target, index) - best) < 1e-9, `${r.playerId} #${index}: ${r.target} is not the EV max`);
-      }
-      // the 强力属性 share range follows the period
+      assert.ok(recs.length > 0, `event #${index} has entries`);
+      // the 强力属性 share range is the unified one in every period
       const foeRec = m.eventFoeHistory.find((x) => x.index === index);
-      assert.ok(foeRec && EVENT_SEQUENCE[index - 1].eliteShares.includes(foeRec.elite.share), `E${index} elite share`);
+      assert.ok(foeRec && EVENT_FOE_ELITE_SHARES.includes(foeRec.elite.share), `E${index} elite share`);
     }
   });
 

@@ -230,20 +230,24 @@ export const opponentRevealed = (round) => Math.floor(Number(round) || 0) > VERS
 export const teamOfSeat = (seat) => Math.floor(seat / TEAM_SIZE) % TEAMS;
 
 /**
- * 2V2 事件期 (类肉鸽词条, design 2026-10-17): three event periods per match, aligned with the 狩猎期 rhythm:
+ * 2V2 事件期 (类肉鸽词条, design 2026-10-17; rules reworked 2026-10-24, spec 0.0.5 需求 1): three event periods per
+ * match, aligned with the 狩猎期 rhythm:
  *   E1 = the drawn contest round (contestStartRound: R4 / R5 / R6),
  *   E2 = E1 + EVENT_SECOND_OFFSET (4 rounds; R8 / R9 / R10),
  *   E3 = EVENT_FINAL_ROUND (R13, the 最终狩猎);
  * none of them collides with the R14/R15 boss rounds. Each period runs after ROUND_START and before that round's
- * 机变 / 休整期, so its entries are in force when the players deploy. Each event draws TWO entries:
- *   1. the ALLY entry: each player gives ONE to ONE target (对面 A / 对面 B / 队友 / 自己); a target cannot be chosen
- *      twice by the same player in one match (3 events cover 3 of the 4 targets). The TYPE odds move with the sequence
- *      (EVENT_SEQUENCE: E1 friendly, E2 neutral, E3 debuff-heavy) and the entry is then drawn from EVENT_CARDS;
- *   2. the MONSTER entry: drawn once per event, independent of the target choices (its own seeded stream), with its own
- *      per-sequence odds and 强力属性 share range (EVENT_SEQUENCE), applied to that round's wave — enemy mods only,
- *      never a player's mods, never a bounty amount.
- * The entries are pure data (no display text: the UI slice adds the i18n names); `ev` is the AI's heuristic value only
- * (server/match/match/event.js eventEvFor — it is not a rule).
+ * 机变 / 休整期, so its entries are in force when the players deploy. The three periods run under ONE identical rule
+ * set (the 0.0.5 rework dropped the per-sequence odds, the 自己 ×2 magnitude and the "one target per match" limit):
+ *   1. ALLY packs: each alive player still picks ONE target (对面 A / 对面 B / 队友 / 自己; a target may be picked
+ *      again in later events and by several pickers), but the pick now deals a PACK of EVENT_PACK_SIZE entries to the
+ *      TARGET — one pack per selection (chosen N times → N packs), the pack's shape decided by the side it was
+ *      chosen on (EVENT_PACK_KINDS: 对面包 1 减益 + 2 中性, 我方包 1 增益 + 2 中性). A player chosen 0 times gets one
+ *      默认包 (3 中性) at the period's close — the per-event floor.
+ *   2. the MONSTER entry: drawn once per event, independent of the target choices (its own seeded stream), with the
+ *      unified foe odds (EVENT_FOE_ODDS) and 强力属性 share range (EVENT_FOE_ELITE_SHARES), applied to that round's
+ *      wave — enemy mods only, never a player's mods, never a bounty amount.
+ * The entries are pure data (no display text: the UI slice adds the i18n names). Draws never repeat a card while its
+ * kind still has an unused one in the match-wide bag (server/match/match/event.js eventDrawAlly).
  */
 /** The last event period: R13, the 最终狩猎 (a normal hunt round, never a boss round). */
 export const EVENT_FINAL_ROUND = 13;
@@ -263,8 +267,23 @@ export const eventRoundsFor = (contestStartRound) => {
 };
 /** The four target keys of `g.event.pick { target }`. */
 export const EVENT_TARGETS = Object.freeze(['self', 'mate', 'oppA', 'oppB']);
-/** A self-targeted entry's magnitude multiplier (all numeric values in the entry, refresh uses included). */
-export const EVENT_SELF_MUL = 2;
+/**
+ * How many entries one pack holds (0.0.5 发包规则: a selection deals a pack of 3 to its target — 对面包 / 我方包 — and
+ * the 默认包 of an unchosen player is 3 中性 as well). One line to tune.
+ */
+export const EVENT_PACK_SIZE = 3;
+/**
+ * The composition of one pack, as EVENT_CARDS kinds in draw order (0.0.5 需求 1.3). The first slot is the pack's
+ * distinctive entry (它 is also the `m.event` summary card an old client shows); the rest are the neutral fillers.
+ *   opp     对面包 — the target was chosen as 对面 A / 对面 B: 1 减益 + 2 中性;
+ *   own     我方包 — the target was chosen as 自己 / 队友: 1 增益 + 2 中性;
+ *   default 默认包 — the target was not chosen this period: 3 中性 (the per-event floor).
+ */
+export const EVENT_PACK_KINDS = Object.freeze({
+  opp: Object.freeze(['down', 'mid', 'mid']),
+  own: Object.freeze(['up', 'mid', 'mid']),
+  default: Object.freeze(['mid', 'mid', 'mid']),
+});
 /**
  * How many rounds an ally entry stays in force (user 2026-10-17: 集市换货's 出售价 −1 lasted the whole match, so a sold
  * operator returned nothing — far too strong). An entry picked at round R is active in R, R+1, …, R+duration−1 and
@@ -276,37 +295,15 @@ export const EVENT_DURATION_ROUNDS = 4;
 /** The event phase's selection window in seconds (a timed-out seat is auto-picked by EV: botEventTarget). */
 export const EVENT_PICK_SECONDS = 20;
 /**
- * The three sequence rows — the single source of the per-order odds and elite share ranges. The ally odds apply to the
- * ally channel as a whole (the target decides WHO receives it; "增" is good for the target), moving from friendly E1 to
- * debuff-heavy E3. The monster odds are from OUR side (favor = weakens the enemies). `eliteShares` are the two values
- * the 强力属性 share is drawn from in that period.
+ * The monster-channel odds, UNIFIED across the three periods (0.0.5: the per-sequence rows are gone — every period
+ * draws the monster entry at 25 / 40 / 35, from OUR side (favor = weakens the enemies), expectation −0.10).
  */
-export const EVENT_SEQUENCE = Object.freeze([
-  Object.freeze({
-    index: 1,
-    allyOdds: Object.freeze({ down: 15, mid: 45, up: 40 }),
-    foeOdds: Object.freeze({ favor: 35, mid: 40, unfavor: 25 }),
-    eliteShares: Object.freeze([0.10, 0.15]),
-  }),
-  Object.freeze({
-    index: 2,
-    allyOdds: Object.freeze({ down: 30, mid: 40, up: 30 }),
-    foeOdds: Object.freeze({ favor: 25, mid: 40, unfavor: 35 }),
-    eliteShares: Object.freeze([0.15, 0.20]),
-  }),
-  Object.freeze({
-    index: 3,
-    allyOdds: Object.freeze({ down: 45, mid: 30, up: 25 }),
-    foeOdds: Object.freeze({ favor: 20, mid: 35, unfavor: 45 }),
-    eliteShares: Object.freeze([0.20, 0.25]),
-  }),
-]);
-/** E2's neutral ally row (the match always reads EVENT_SEQUENCE; kept as the documented baseline for tools/tests). */
-export const EVENT_ODDS = EVENT_SEQUENCE[1].allyOdds;
-/** E2's neutral monster row (same note). */
-export const EVENT_FOE_ODDS = EVENT_SEQUENCE[1].foeOdds;
-/** E2's elite share range (same note). */
-export const EVENT_FOE_ELITE_SHARES = EVENT_SEQUENCE[1].eliteShares;
+export const EVENT_FOE_ODDS = Object.freeze({ favor: 25, mid: 40, unfavor: 35 });
+/**
+ * The two values the 强力属性 share is drawn from in EVERY period (seeded pick of one endpoint; 0.0.5 unified the old
+ * per-sequence 10–15 / 15–20 / 20–25 ranges on the baseline 15 %~20 % row).
+ */
+export const EVENT_FOE_ELITE_SHARES = Object.freeze([0.15, 0.20]);
 /**
  * The 24 ally entries, in four classes (output / survival / sp / economy). The SP class replaced the removed range
  * class (射程 removal, user 2026-10-17): no entry carries `range` / `rangeExtend` / attack-distance data any more — the
@@ -315,7 +312,8 @@ export const EVENT_FOE_ELITE_SHARES = EVENT_SEQUENCE[1].eliteShares;
  * Class / entry (name is the comment; the UI slice maps the `key` to its i18n msgid). Magnitudes were scaled ×1.5
  * (user 2026-10-17, "方案 A 只 ×1.5"): percentages keep two decimals (half-percents round to the integer percent the
  * owner listed), flat points scale, fixed coins +2 → +3; the discrete values (SP cost ±1, deploy +1, the market's
- * refresh/sell integers) stay as they are. "给自己" still multiplies the FINAL magnitudes by 2.
+ * refresh/sell integers) stay as they are. Since 0.0.5 every value is applied at its base magnitude (the 自己 ×2
+ * multiplier is gone — picking yourself deals a 我方包 instead).
  *   output    磨刃 atkPct +20% · 追风 aspd +18 · 破甲 defIgnorePct 22% · 钝口 atkPct −9% · 重弩 atkPct +20% / aspd −18 ·
  *             连击 aspd +27 / atkPct −15%
  *   survival  猎人披挂 hpPct +38% · 营地篝火 regenPct 9%/s · 铁衣 defPct +22% · 血痕 dmgTaken +12% · 轻装远行 hpPct +38% /
@@ -374,8 +372,8 @@ export const EVENT_CARDS = Object.freeze([
  *   生存  创口 hpMul 0.82 · 坚壳 defMul 1.22 / speedMul 0.78 · 厚皮 hpMul 1.18
  *   速度  迟缓 speedMul 0.78 · 盘踞 speedMul 0.7 / hpMul 1.18 · 疾行 speedMul 1.22
  *   数量  稀疏 countAdd −1 · 替换 countAdd −1 / hpMul 1.3 · 增援 countAdd +1
- * `ev` is from OUR side (+ favourable, − unfavourable). The per-sequence odds live in EVENT_SEQUENCE (E2 = 25 / 40 / 35,
- * expectation −0.10; E1 +0.10; E3 −0.25): the monster channel is a gentle sequence-driven difficulty ramp.
+ * `ev` is from OUR side (+ favourable, − unfavourable). The unified odds live in EVENT_FOE_ODDS (25 / 40 / 35,
+ * expectation −0.10 in every period since 0.0.5).
  */
 export const EVENT_FOE_CARDS = Object.freeze([
   // ---- attack ---------------------------------------------------------------------------------------------------
@@ -398,8 +396,8 @@ export const EVENT_FOE_CARDS = Object.freeze([
 
 /**
  * 强力属性子集 (user 2026-10-17, tier 2): every event ALSO marks a share of that round's enemies as 强力 — the normal
- * wave AND the 赏金怪 (tag 'bounty'); the share range moves with the sequence (EVENT_SEQUENCE.eliteShares:
- * E1 10–15 %, E2 15–20 %, E3 20–25 %). One attribute is drawn per event (1 of these 4), and the marked units get its
+ * wave AND the 赏金怪 (tag 'bounty'); the share is drawn by seed from EVENT_FOE_ELITE_SHARES (15 %~20 % in every
+ * period since 0.0.5). One attribute is drawn per event (1 of these 4), and the marked units get its
  * multiplier ON TOP of the monster card's own mods. The bounty amount (`bounty.coins`) is never recalculated.
  *   獠牙 fangs      attack +25 %  (atkMul 1.25)
  *   厚皮 thick_hide health +30 %  (hpMul 1.30)
