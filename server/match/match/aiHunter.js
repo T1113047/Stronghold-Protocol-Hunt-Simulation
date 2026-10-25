@@ -215,7 +215,7 @@ export class MatchAiHunter {
       .filter((c) => c.score > 0));
     const out = [];
     const used = new Set();
-    while (out.length < cap) {
+    while (out.length < cap) { // loop-cap: confrontBossCap(), and the scored pool shrinks each pass
       const pool = ranked.filter((c) => !used.has(c.key));
       if (!pool.length) break;
       const c = drawRanked(this.rngAiHunt, pool, AI_HUNT.width[tier]);
@@ -247,7 +247,7 @@ export class MatchAiHunter {
     let left = this.confrontBudget();
     const picks = [];
     const once = new Set();
-    while (picks.length < num(VERSUS_CONFRONT.maxPicks)) {
+    while (picks.length < num(VERSUS_CONFRONT.maxPicks)) { // loop-cap: VERSUS_CONFRONT.maxPicks, and every pass spends budget
       const fresh = ranked.filter((c) => !once.has(c.key) && c.value <= left);
       // breadth first; only once nothing new fits does the plan repeat an answer that still fits
       const pool = fresh.length ? fresh : ranked.filter((c) => c.value <= left);
