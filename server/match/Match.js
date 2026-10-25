@@ -229,6 +229,7 @@ import { MatchPause } from './match/pause.js';
 import { MatchPhases } from './match/phases.js';
 import { MatchEvent } from './match/event.js';
 import { MatchSetupVote } from './match/setupVote.js';
+import { MatchAiHunter } from './match/aiHunter.js';
 import { MatchConfront } from './match/confront.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
@@ -428,6 +429,8 @@ export class Match {
     this.rngConfront = rng('confront');
     // 狩猎期 type cards: draw 4 of the 7 特训敌人 types per round (2 UP + 2 normal)
     this.rngConfrontTypes = rng('confront-types');
+    // 「猎手 AI」(0.0.5): which opponent, which monster, which boss — its own stream, so no other draw shifts (aiHunter.js)
+    this.rngAiHunt = rng('ai-hunt');
     // 同盟狩猎: the system's prey picks (one stream of its own; a co-op match is the only consumer)
     this.rngCoopHunt = rng('coop-hunt');
     // 2V2 事件期: the type / entry draws (its own stream too — golden scenarios never enter the event phase)
@@ -615,7 +618,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEvent, MatchSetupVote, MatchConfront, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchEvent, MatchSetupVote, MatchAiHunter, MatchConfront, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

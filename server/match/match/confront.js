@@ -860,7 +860,10 @@ export class MatchConfront {
       .filter(([pid]) => this.teamIdOf(this.players.get(pid)) === t).map(([, v]) => v);
     if (!this.confrontTargets.has(ps.playerId)) {
       const free = oppIds.filter((pid) => !takenBy(team).includes(pid));
-      const chosen = typeof want === 'string' && free.includes(want) ? want : free[0];
+      // 「猎手 AI」(0.0.5): a bot seat aims at the opponent its placement answers best, not at the first empty seat;
+      // a human's named target and every fallback stay exactly as they were.
+      const hunted = ps.botControlled && this.aiHuntTier() !== 'off' ? this.aiHunterTarget(free) : null;
+      const chosen = typeof want === 'string' && free.includes(want) ? want : (hunted ?? free[0]);
       if (chosen) this.confrontTargets.set(ps.playerId, chosen);
     }
     if (!fillMates) return;
@@ -967,9 +970,18 @@ export class MatchConfront {
    *  its group, most expensive fitting monster first (the client's 自动选择 button walks the group the player chose — the
    *  AI prefers 特异 (the biggest, most "generic" type), then walks the types in order until one can actually afford
    *  something, since a tight budget can leave a small type with nothing at all). The 事件期 boss 格 stays EMPTY here
-   *  ([ASSUMED], user 2026-10-21: bots / 托管 never pick bosses — the auto-fill keeps its deterministic picks). */
+   *  ([ASSUMED], user 2026-10-21: bots / 托管 never pick bosses — the auto-fill keeps its deterministic picks).
+   *  0.0.5 「猎手 AI」: on a NORMAL / HARD / ABYSS 2V2 the greedy fill above is only the FALLBACK — `aiHunterPlan`
+   *  answers the fielding of the seat this bot aims at (and the strongest tier may use the boss 格), and its plan is
+   *  accepted only after the human gate `_confrontMember` passes it; budget, caps and pool are the human ones. */
   botConfront(ps) {
     if (this.phase !== PHASE.CONFRONT || this.confrontStage !== 'monster' || this.confrontSubs.has(ps.playerId)) return;
+    const hunted = this.aiHunterPlan(ps);
+    if (hunted) {
+      this.confrontSubs.set(ps.playerId, hunted);
+      this.markPublic();
+      return;
+    }
     const groups = this.confrontGroups();
     const budget = this.confrontBudget();
     const plan = (recs) => {

@@ -176,6 +176,47 @@ export const VERSUS_CONFRONT = Object.freeze({
 });
 
 /**
+ * 「猎手 AI」(AI 狩猎模式; 维护者 2026-10-25, spec 本工作区 `_scratch/开发规格-AI狩猎模式-2026-10-25.md`, 不进仓库):
+ * a botControlled seat's 狩猎期 placement stops being a self-centred greedy fill and starts ANSWERING the seat it aims
+ * at — which opponent to aim at, which monsters answer that player's fielding, when to insert them, and (the strongest
+ * tier only) whether to use the free boss 格.
+ *
+ * It changes the CHOICE, never the resources: the same budget, the same candidate pool, the same caps, and the finished
+ * plan is checked by the human gate (server/match/match/confront.js `_confrontMember`) before it is kept, so an illegal
+ * plan can never reach a wave and an AI can never out-spend a player.
+ * K1 (维护者 2026-10-25): the tier is bound to the difficulty and FUNNY never hunts. K2: the read-out is the target's
+ * FIELDING (its board) plus the round's wave / stage — never its hand, shop, funds or 坎诺特 balance, and the board's
+ * base chess stats only (equipment and 特质 are not modelled).
+ *
+ * Every number below is [ASSUMED]: the official mode has no AI opponent, so no source sets them. They are one line each
+ * to tune, and the playtest pass (M4) is what fixes them.
+ */
+export const AI_HUNT = Object.freeze({
+  /** Master switch. false leaves every bot placement exactly as it was (the locked 2V2 golden baseline). */
+  enabled: true,
+  /** K1: the difficulty decides the tier; 'off' skips the hunter completely. */
+  tier: Object.freeze({ FUNNY: 'off', NORMAL: 'weak', HARD: 'mid', ABYSS: 'strong' }),
+  /**
+   * How far down the counter-ranking a pick may fall: 1 always takes the best answer, 6 plays sloppily. This is the
+   * whole strength dial — it is applied to the target choice, the monster choice and the boss choice.
+   */
+  width: Object.freeze({ weak: 6, mid: 3, strong: 1 }),
+  /** K3: only these tiers may fill the 事件期 boss 格 (the cap `confrontBossCap()` and the no-budget rule stay human). */
+  bossTiers: Object.freeze(['strong']),
+  /** The insertion slots a tier may pick; weak keeps today's 'mid'. */
+  positions: Object.freeze({ weak: Object.freeze(['mid']), mid: Object.freeze(['front', 'mid', 'back']), strong: Object.freeze(['front', 'mid', 'back']) }),
+  /** The counter weights, in score points, per monster tag (aiHunter.js enemyTagsOf). */
+  weights: Object.freeze({
+    fly: 6, ranged: 4, invisible: 5, times: 4, dot: 2, element: 2, reflection: 3,
+    armor: 5, resist: 4, sustain: 3, summon: 4, elite: 3, hard: 3,
+  }),
+  /** Read-out references: what counts as a covered board / a hard monster. */
+  refs: Object.freeze({ pieces: 6, block: 6, def: 1000, res: 60, atk: 900 }),
+  /** Target choice: how strongly a seat that is thin on pieces is preferred (it has less left to answer the placement). */
+  pressure: Object.freeze({ thin: 3 }),
+});
+
+/**
  * 同盟狩猎 (co-op hunt, user 2026-10-17): a `mode_multi_*` (4-player co-op) room keeps the exact same co-op gameplay,
  * but every 狩猎期 is filled by the SYSTEM instead of the players. The rhythm is the 2V2 one (HUNT_RHYTHM: the drawn
  * start round R4/R5/R6, 5 % +2 %/round, cap 15 %, R13 最终狩猎 50 %), the monsters come from the official 特训敌人 types
