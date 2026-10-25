@@ -956,13 +956,15 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   border: 1px solid rgba(242, 189, 62, .45); background: rgba(242, 189, 62, .08); }
 .evov__hint { margin: .07rem 0 .1rem; font-size: calc(.12 * var(--t)); flex: 0 0 auto; }
 .evohist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .04rem; flex: 0 0 auto; }
-.evohist__row { display: flex; align-items: center; gap: .12rem; padding: .04rem .1rem; border: 1px solid var(--line);
+.evohist__row { display: flex; flex-wrap: wrap; align-items: center; gap: .12rem; padding: .04rem .1rem; border: 1px solid var(--line);
   font-size: calc(.13 * var(--t)); color: var(--text-md); }
 .evohist__row.is-cur { border-color: var(--mint-800); background: rgba(23, 249, 183, .05); }
 .evohist__n { min-width: .66rem; font-weight: 800; color: var(--mint-400); }
 .evohist__round { min-width: .42rem; color: var(--text-lo); }
 .evohist__target { min-width: 1.1rem; color: var(--text-hi); }
-.evohist__card { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* one chip per entry; 0.0.5: never ellipsised — the en / ja / ko entry names are longer than the Chinese ones and were
+   cut to "Whets…". The row wraps instead (flex-wrap above), so a full name is always readable. */
+.evohist__card { flex: 0 1 auto; min-width: 0; white-space: normal; overflow: visible; }
 .evohist__link { display: inline-flex; align-items: center; gap: .03rem; padding: 0; border: 0; background: none;
   color: var(--text-hi); font: inherit; text-align: left; text-decoration: underline dotted; text-underline-offset: .02rem; cursor: pointer; }
 .evohist__link .icon { width: .14rem; height: .14rem; flex: none; opacity: .6; }
@@ -1012,6 +1014,11 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .rospov__group { padding: .06rem .04rem .02rem; font-size: calc(.15 * var(--t)); font-weight: 800; letter-spacing: .1em; color: var(--mint-400); }
 .rospov__group:not(:first-child) { margin-top: .06rem; color: #ffab97; }
 .rospov__note { margin: 0; font-size: calc(.13 * var(--t)); }
+/* the 词条公示 keeps the round's monster entry on screen (the picking phase shows it, the 5 s hold must not drop it) */
+.rospov__foe { display: flex; flex-wrap: wrap; gap: .06rem; align-items: baseline; margin: .04rem 0 0;
+  font-size: calc(.13 * var(--t)); color: var(--text-md); }
+.rospov__foe b { color: var(--text-hi); }
+.rospov__elite { color: var(--text-dim); }
 .rospov__foe { flex: 0 0 auto; display: flex; flex-direction: column; gap: .04rem; padding: .07rem .14rem .08rem; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .02); }
 .rospov__h { margin: 0; color: var(--text-lo); font-size: calc(.13 * var(--t)); letter-spacing: .08em; }
 .rospov__foeline { display: flex; align-items: baseline; gap: .14rem; flex-wrap: wrap; margin: 0; font-size: calc(.15 * var(--t)); color: var(--text-md); }

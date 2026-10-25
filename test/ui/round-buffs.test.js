@@ -185,8 +185,7 @@ test('each strip row carries the 词条说明 popup payload: class icon, kind to
   assert.equal(ally.detail.tone, 'red', 'a down entry is red');
   assert.equal(ally.detail.classLabel, '输出');
   // 0.0.5: values are always the base (the 自己 ×2 multiplier is gone), and every line names its subject
-  assert.equal(ally.detail.base, '自己的干员攻击力 -9%', 'the base effect');
-  assert.equal(ally.detail.now, '自己的干员攻击力 -9%', 'no target multiplier any more');
+  assert.equal(ally.detail.effect, '自己的干员攻击力 -9%', 'the effect line (0.0.5: one line, no base/current pair)');
   assert.equal(ally.detail.mag, 1);
   assert.equal(ally.detail.subject, '自己的干员', '作用对象: 「X 的干员」');
   assert.equal(ally.detail.packLabel, '我方包', '归属: the pack the entry was dealt from');

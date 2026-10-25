@@ -97,6 +97,16 @@ const pNo = (p) => (p && Number.isInteger(p.seat) ? `P${p.seat + 1}` : '');
 /** The display name of a player row ("P1 A"), for 来自 {name}. */
 const pLabel = (p) => [pNo(p), (p && p.name) || '?'].filter(Boolean).join(' ');
 
+/**
+ * One seat as the copy names it: 「自己」, or the target kind with its seat number — 「队友（P2）」/「对面 A（P3）」
+ * (0.0.5 文案: 选择面板、结果行、本局记录与词条弹窗用同一个写法，同盟狩猎也由此说明是哪一位队友)。
+ */
+export function seatLabel(key, player = null) {
+  const base = t(TARGET_LABEL[key] || '目标玩家');
+  const seat = player ? pNo(player) : '';
+  return seat ? `${base}（${seat}）` : base;
+}
+
 /** Two decimals at most, trailing zeros dropped ('0.85', '1.2', '36'). */
 const num = (v) => String(Math.round(Number(v) * 100) / 100);
 /** A signed number for the effect lines ('+20', '-9', '+0.3'). */
@@ -112,7 +122,7 @@ const OPERATOR_FIELDS = [
 
 /** The subject of one ally entry's effects (需求 2 术语): 「X 的干员」/ 「X 的敌人」 / 「X」 (X = the receiver's label). */
 export function allySubject(card, who = t('目标玩家')) {
-  if (card && card.enemySpeed) return t('{who}的敌人', { who });
+  if (card && card.enemySpeed) return t('{who}战场的敌人', { who });
   if (OPERATOR_FIELDS.some((k) => card && card[k])) return t('{who}的干员', { who });
   return who;
 }
@@ -133,7 +143,7 @@ export function allyEffect(card, who = t('目标玩家'), mag = 1) {
   if (card.defPct) out.push(t('{who}的干员防御力 {v}%', { who, v: pct(card.defPct * mag) }));
   if (card.dmgTaken) out.push(t('{who}的干员受到的伤害 {v}%', { who, v: pct(card.dmgTaken * mag) }));
   if (card.moveMul) out.push(t('{who}的干员移动速度 ×{v}', { who, v: num(1 + (card.moveMul - 1) * mag) }));
-  if (card.enemySpeed) out.push(t('{who}的敌人移动速度 {v}%', { who, v: pct(card.enemySpeed * mag) }));
+  if (card.enemySpeed) out.push(t('{who}战场的敌人移动速度 {v}%', { who, v: pct(card.enemySpeed * mag) }));
   if (card.spRecoveryMul) out.push(t('{who}的干员技力回复 ×{v}', { who, v: num(1 + (card.spRecoveryMul - 1) * mag) }));
   if (card.spRecoveryFlat) out.push(t('{who}的干员每秒技力 {v}', { who, v: signed(card.spRecoveryFlat * mag) }));
   if (card.spCostFlat) out.push(t('{who}的干员技力消耗 {v}', { who, v: signed(card.spCostFlat * mag) }));
@@ -197,8 +207,9 @@ export function detailOf(kind, card, {
     key: card.key,
     name: t((ally ? ALLY_NAMES : FOE_NAMES)[card.key] || card.key),
     ...look,
-    base: ally ? allyEffect(card, whoLabel) : foeEffect(card),
-    now: ally ? allyEffect(card, whoLabel, mag) : foeEffect(card),
+    // 0.0.5: the magnitude is always 1 (the 自己 ×2 is gone), so one effect line is enough — the popup has no
+    // "base vs current" pair to show any more
+    effect: ally ? allyEffect(card, whoLabel, mag) : foeEffect(card),
     mag,
     duration: rounds,
     // 归属 (0.0.5): which pack the entry was dealt from (我方包 / 对面包 / 默认包); null when unknown
@@ -239,18 +250,20 @@ export function eventRosterRows(pub, ally, index) {
       const from = pack.from ? byId.get(pack.from) || null : null;
       const label = t(PACK_LABEL[pack.kind] || PACK_LABEL.default);
       const times = Number(selected[p.playerId]) || 0;
+      // 被选 N 次 = N 个包：多包时必须标出「第几包」，否则两行只差「来自」，看着像重复渲染 (0.0.5 文案)
+      const which = list.length > 1 && Number.isInteger(pack.pack) ? ` · ${t('第 {k} 包', { k: pack.pack })}` : '';
       out.push({
         key: `pack:${p.playerId}:${pack.pack ?? out.length + 1}`,
         body: html`<span class="rospov__give">
           <b class="rospov__p num">${pNo(p)}</b><span class="rospov__name">${p.name || '?'}</span>
           <span class="rospov__verb">${pack.kind === 'default'
             ? label
-            : `${label} · ${t('被选 {n} 次', { n: times })}${from ? ` · ${t('来自 {name}', { name: pLabel(from) })}` : ''}`}</span>
+            : `${label} · ${t('被选 {n} 次', { n: times })}${which}${from ? ` · ${t('来自 {name}', { name: pLabel(from) })}` : ''}`}</span>
           ${cards.map((card) => html`<button key=${card.key} type="button" class="rospov__eff evohist__link"
               title=${t('点击查看词条说明')}
               onClick=${() => openEntryDetail(detailOf('ally', card, {
                 picked: (ally && ally.round) || null, round: (pub && pub.round) || null,
-                target: pack.target || 'self', who: p.name || pNo(p), packKind: pack.kind,
+                target: pack.target || 'self', who: pLabel(p), packKind: pack.kind,
               }))}>「${t(ALLY_NAMES[card.key] || card.key)}」<${Icon} name="info" /></button>`)}
         </span>`,
       });
@@ -302,8 +315,9 @@ export function EventOverlay({ pub, busy = false, onPick }) {
   // the picked pack (the result line) and the three rows of the match's selections
   const packKindOf = (rec) => (rec && rec.packKind) || (rec && (rec.target === 'oppA' || rec.target === 'oppB') ? 'opp' : 'own');
   const pickedTarget = myPick ? myPick.target : null;
-  const pickedTargetLabel = pickedTarget && TARGET_LABEL[pickedTarget] ? t(TARGET_LABEL[pickedTarget]) : '';
-  const pickedWho = pickedTarget && TARGET_LABEL[pickedTarget] ? t(TARGET_LABEL[pickedTarget]) : t('目标玩家');
+  // 0.0.5 文案: the label carries the SEAT («对面 A（P3）» / «队友（P2）»), so a co-op 队友 pick says which
+  // teammate it went to and an 对面 pick cannot be misread as "the enemies the opponent sent"
+  const pickedWho = pickedTarget ? seatLabel(pickedTarget, byId.get(targets[pickedTarget])) : t('目标玩家');
   const pickedPackLabel = t(PACK_LABEL[packKindOf(myPick)] || PACK_LABEL.own);
   const pickedCards = (myPick && Array.isArray(myPick.entries) ? myPick.entries : [])
     .map((e) => ALLY_BY_KEY.get(e && e.key) || ALLY_BY_ID.get(e && e.card) || null)
@@ -318,7 +332,7 @@ export function EventOverlay({ pub, busy = false, onPick }) {
     const target = rec ? rec.target : null;
     return {
       n, round, rec, cards,
-      targetLabel: target && TARGET_LABEL[target] ? t(TARGET_LABEL[target]) : t('尚未选择'),
+      targetLabel: target ? seatLabel(target, byId.get(rec.targetId)) : t('尚未选择'),
       packLabel: rec ? t(PACK_LABEL[packKindOf(rec)] || PACK_LABEL.own) : null,
     };
   });
@@ -346,8 +360,16 @@ export function EventOverlay({ pub, busy = false, onPick }) {
   if (ally.stage === 'roster' && ally.roster) {
     const rosterRows = eventRosterRows(pub, ally, index);
     if (rosterRows.length) {
+      // the 5 s 公示 used to drop the monster entry the picking phase had just shown — the round's wave changes because
+      // of it, so the announcement keeps it on screen (0.0.5 文案)
+      const foeLine = foeCard ? html`<p class="rospov__foe" data-testid="event-roster-foe">
+        <b>${t('本回合的怪物词条')}</b> <span>${t(FOE_NAMES[foeCard.key] || foeCard.key)}</span>
+        <span class="evov__eff">${foeEffect(foeCard)}</span>
+        ${elite ? html`<span class="rospov__elite">· ${t('强力属性')}${eliteName ? ` ${t('本回合 {share}% 的敌人带「{attr}」', { share: eliteShare, attr: t(eliteName) })}` : ''}</span>` : null}
+      </p>` : null;
       return html`<${RosterPanel} title=${t('词条公示')} micro=${'ENTRIES // ' + t('词条公示')} tone="mint"
         testid="event-roster" rows=${rosterRows} until=${Number(ally.roster.until) || Number(pub.deadline) || 0}
+        children=${foeLine}
         note=${t('被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。')} />`;
     }
   }
@@ -407,7 +429,7 @@ export function EventOverlay({ pub, busy = false, onPick }) {
           <${Icon} name="check" />
           <span>${pickedTarget === 'self' || !pickedTarget
             ? t('已选择 → 你收到了{pack}：{cards}', { pack: pickedPackLabel, cards: pickedNames })
-            : t('已选择 → 送给{target}{pack}：{cards}', { target: pickedTargetLabel, pack: pickedPackLabel, cards: pickedNames })}</span>
+            : t('已选择 → 送给{target}{pack}：{cards}', { target: pickedWho, pack: pickedPackLabel, cards: pickedNames })}</span>
           ${pickedEffects ? html`<span class="evov__eff">${pickedEffects}</span>` : null}
           ${pickedCards.map((card) => html`<button key=${card.key} type="button" class="evov__look" title=${t('点击查看词条说明')}
             onClick=${() => openEntryDetail(detailOf('ally', card, {

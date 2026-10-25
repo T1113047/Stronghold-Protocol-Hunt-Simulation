@@ -80,7 +80,7 @@ export function useEntryDetail() {
 
 /**
  * The popup itself. `detail` is plain text resolved by the caller:
- *   { kind, key, name, icon, tone, kindLabel, classLabel, base, now, mag, subject, packLabel, targetLabel, picked,
+ *   { kind, key, name, icon, tone, kindLabel, classLabel, effect, mag, subject, packLabel, targetLabel, picked,
  *     round, elite?: { name, share, count, effect } }
  */
 export function EntryDetailDialog({ detail, onClose }) {
@@ -111,7 +111,7 @@ export function EntryDetailDialog({ detail, onClose }) {
       <span class="entrydlg__v">${detail.subject || detail.targetLabel || t('目标玩家')}${ally ? html` · ${t('持续 {n} 回合', { n: duration })}` : ''}</span>
     </p>
 
-    <p class="entrydlg__row"><span class="entrydlg__k">${t('当前效果')}</span><span class="entrydlg__v">${detail.now || detail.base || '—'}</span></p>
+    <p class="entrydlg__row"><span class="entrydlg__k">${t('当前效果')}</span><span class="entrydlg__v">${detail.effect || '—'}</span></p>
 
     ${!ally && detail.elite ? html`<div class="entrydlg__elite">
       <p class="entrydlg__row"><span class="entrydlg__k">${t('强力属性')}</span><span class="entrydlg__v"><b>${detail.elite.name}</b>

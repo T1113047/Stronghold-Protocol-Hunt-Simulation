@@ -92,14 +92,15 @@ test('the round\'s monster entry and 强力属性 come first, before the targets
   // every card of both channels has its msgid mapping
   for (const c of EVENT_CARDS) assert.match(OVERLAY, new RegExp(`${c.key}: N_\\('`), `ally entry ${c.key}`);
   for (const c of EVENT_FOE_CARDS) assert.match(OVERLAY, new RegExp(`${c.key}: N_\\('`), `monster entry ${c.key}`);
-  // 0.0.5 需求 2: every effect line names its subject (「X 的干员」/「X 的敌人」/「双方战场的敌人」)
+  // 0.0.5 需求 2: every effect line names its subject (「X 的干员」/「X 战场的敌人」/「双方战场的敌人」— 2V2 里
+  // 「X 的敌人」会被读成「X 派来的敌人」，所以点名是哪一片战场)
   assert.match(OVERLAY, /t\('\{who\}的干员攻击力 \{v\}%', \{ who, v: pct\(card\.atkPct \* mag\) \}\)/);
-  assert.match(OVERLAY, /t\('\{who\}的敌人移动速度 \{v\}%', \{ who, v: pct\(card\.enemySpeed \* mag\) \}\)/);
+  assert.match(OVERLAY, /t\('\{who\}战场的敌人移动速度 \{v\}%', \{ who, v: pct\(card\.enemySpeed \* mag\) \}\)/);
   assert.match(OVERLAY, /t\('双方战场的敌人攻击力 ×\{v\}', \{ v: num\(card\.atkMul\) \}\)/);
   assert.match(OVERLAY, /export function allySubject\(card, who = t\('目标玩家'\)\)/);
   assert.match(OVERLAY, /const pct = \(ratio\) => signed\(Number\(ratio\) \* 100\);/);
   for (const k of ['本回合的怪物词条', '强力属性', '本回合 {share}% 的敌人带「{attr}」', '共 {count} 只',
-    '{who}的干员', '{who}的敌人', '目标玩家', '双方战场的敌人']) inEveryPack(k);
+    '{who}的干员', '{who}战场的敌人', '目标玩家', '双方战场的敌人']) inEveryPack(k);
 });
 
 test('a target may be picked again (0.0.5): the only lock is the one pick per period and the seat\'s own state', () => {
@@ -142,7 +143,7 @@ test('the picked pack names WHO got it and what it holds: 你收到了 for self,
   assert.match(OVERLAY, /const packKindOf = \(rec\) => \(rec && rec\.packKind\) \|\| \(rec && \(rec\.target === 'oppA' \|\| rec\.target === 'oppB'\) \? 'opp' : 'own'\);/);
   assert.match(OVERLAY, /const pickedPackLabel = t\(PACK_LABEL\[packKindOf\(myPick\)\] \|\| PACK_LABEL\.own\);/);
   assert.match(OVERLAY, /t\('已选择 → 你收到了\{pack\}：\{cards\}', \{ pack: pickedPackLabel, cards: pickedNames \}\)/);
-  assert.match(OVERLAY, /t\('已选择 → 送给\{target\}\{pack\}：\{cards\}', \{ target: pickedTargetLabel, pack: pickedPackLabel, cards: pickedNames \}\)/);
+  assert.match(OVERLAY, /t\('已选择 → 送给\{target\}\{pack\}：\{cards\}', \{ target: pickedWho, pack: pickedPackLabel, cards: pickedNames \}\)/);
   // every entry of the pack is named and every effect line names its subject (X 的干员 / X 的敌人)
   assert.match(OVERLAY, /const pickedNames = pickedCards\.map\(\(c\) => `「\$\{t\(ALLY_NAMES\[c\.key\] \|\| c\.key\)\}」`\)\.join\(''\);/);
   assert.match(OVERLAY, /const pickedEffects = pickedCards\.map\(\(c\) => allyEffect\(c, pickedWho\)\)\.filter\(Boolean\)\.join\(' · '\);/);
@@ -206,4 +207,33 @@ test('词条公示 (the roster hold) states the 发包规则 and the no-repeat p
   const NOTE = "note=${t('被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。')}";
   assert.ok(OVERLAY.includes(NOTE), 'the roster panel hands RosterPanel a note');
   inEveryPack('被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。');
+});
+
+test('0.0.5 文案复审: every seat carries its number, multi-pack rows say which pack, and nothing is ellipsised', () => {
+  // one label helper, used by the result line and by 本局选择记录 — the 公示 rows name the same seat the panel does
+  assert.match(OVERLAY, /export function seatLabel\(key, player = null\)/);
+  assert.match(OVERLAY, /const pickedWho = pickedTarget \? seatLabel\(pickedTarget, byId\.get\(targets\[pickedTarget\]\)\) : t\('目标玩家'\);/);
+  assert.match(OVERLAY, /targetLabel: target \? seatLabel\(target, byId\.get\(rec\.targetId\)\) : t\('尚未选择'\),/);
+  assert.ok(OVERLAY.includes('return seat ? `${base}（${seat}）` : base;'), '「对面 A（P3）」/「队友（P2）」: a co-op mate pick says WHICH teammate');
+  for (const k of ['对面 A', '队友', '第 {k} 包']) inEveryPack(k);
+  // a receiver chosen N times gets N rows — without the pack number two rows look like a duplicate render
+  assert.match(OVERLAY, /const which = list\.length > 1 && Number\.isInteger\(pack\.pack\)/);
+  assert.match(OVERLAY, /t\('第 \{k\} 包', \{ k: pack\.pack \}\)/);
+  assert.match(OVERLAY, /\$\{label\} · \$\{t\('被选 \{n\} 次', \{ n: times \}\)\}\$\{which\}/);
+  // the 公示 keeps the round's monster entry (the picking phase shows it; the 5 s hold dropped it)
+  assert.match(OVERLAY, /data-testid="event-roster-foe"/);
+  assert.match(OVERLAY, /children=\$\{foeLine\}/);
+  // the popup has ONE effect line now (the 自己 ×2 is gone, so base and current were always the same string)
+  assert.match(OVERLAY, /effect: ally \? allyEffect\(card, whoLabel, mag\) : foeEffect\(card\),/);
+  assert.doesNotMatch(OVERLAY, /base: ally \? allyEffect/);
+  assert.match(src('public/js/ui/entryDetail.js'), /\$\{detail\.effect \|\| '—'\}/);
+  // en carries a real plural («Chosen 1 time» / «Chosen 3 times»); the entry chips wrap instead of cutting "Whets…"
+  assert.equal(PACK.en['被选 {n} 次'], 'Chosen {n} {n|time|times}');
+  assert.match(CSS, /\.evohist__row \{[^}]*flex-wrap: wrap/);
+  assert.match(CSS, /\.evohist__card \{[^}]*white-space: normal; overflow: visible/);
+  assert.doesNotMatch(CSS, /\.evohist__card \{[^}]*text-overflow: ellipsis/);
+  // the 0.0.5 rework stranded these msgids: gone from every pack (the tool cannot see them — a complete pack carries them)
+  for (const dead of ['适用对象', '基础效果', '本次效果', '倍率 ×{m}', '把「{card}」给了']) {
+    for (const l of LANGS) assert.equal(PACK[l][dead], undefined, `${l}: ${dead} is no longer rendered anywhere`);
+  }
 });
