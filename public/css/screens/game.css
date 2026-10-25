@@ -610,7 +610,15 @@
    line and a coloured left mark matching the entry's kind — the same language as the teammate rows above. Every row is a
    button: the icon names the class, the dotted underline says "open me", and the 说明 popup (ui/entryDetail.js) carries
    the full effect and its maths. Text sizes read --t (a readable size); long lines truncate instead of wrapping. */
-.rbuffs { display: flex; flex-direction: column; gap: .02rem; align-self: flex-start; max-width: min(2.5rem, 90vw); pointer-events: auto; }
+.rbuffs {
+  --rbuff-row: calc(max(calc(.10 * var(--t)), 10px) * 1.45 + .06rem);
+  display: flex; flex-direction: column; gap: .02rem; align-self: flex-start; max-width: min(2.5rem, 90vw);
+  pointer-events: auto;
+  /* a seat chosen N times stacks 3N entries: cap the strip at six rows and scroll it, or the pile pushes the chat and
+     the seat badges off a landscape phone. The title stays pinned so the list keeps its label. */
+  max-height: calc(var(--rbuff-row) * 6); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+.rbuffs__title { position: sticky; top: 0; z-index: 1; background: rgba(8, 11, 10, .9); }
 .rbuff {
   position: relative;
   display: block; width: 100%; max-width: 100%; margin: 0; padding: .02rem .82rem .02rem .06rem;

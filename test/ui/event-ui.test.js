@@ -198,3 +198,12 @@ test('the panel is phone-landscape first: it scrolls inside, sizes in var(--t), 
     assert.deepEqual(branded, [], `${l}: the event entries carry no brand name`);
   }
 });
+
+test('词条公示 (the roster hold) states the 发包规则 and the no-repeat pool', () => {
+  // the 5 s 公示 is the only place an unchosen player learns WHY they hold three 中性 entries: the picking hint is gone
+  assert.match(OVERLAY, /if \(ally\.stage === 'roster' && ally\.roster\) \{/);
+  assert.match(OVERLAY, /testid="event-roster"/);
+  const NOTE = "note=${t('被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。')}";
+  assert.ok(OVERLAY.includes(NOTE), 'the roster panel hands RosterPanel a note');
+  inEveryPack('被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。');
+});

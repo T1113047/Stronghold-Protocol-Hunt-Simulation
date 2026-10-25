@@ -166,6 +166,10 @@ test('the component reuses the 事件期 overlay: no second card table, no new m
   assert.match(css, /\/\* ---- \[EVBUFF\]/);
   assert.match(css, /\.rbuff \{[^}]*font-size: max\(calc\(\.10 \* var\(--t\)\), 10px\)[^}]*white-space: nowrap; overflow: hidden; text-overflow: ellipsis/s);
   assert.match(css, /\.rbuffs \{[^}]*max-width: min\(2\.5rem, 90vw\)[^}]*pointer-events: auto/);
+  // 0.0.5: one selection deals 3 entries and a seat chosen N times stacks 3N rows — the strip caps at six rows and
+  // scrolls, or the pile pushes the chat and the seat badges off a landscape phone
+  assert.match(css, /\.rbuffs \{[^}]*max-height: calc\(var\(--rbuff-row\) \* 6\)[^}]*overflow-y: auto/s, 'a capped, scrollable strip');
+  assert.match(css, /\.rbuffs__title \{[^}]*position: sticky; top: 0/, 'the title stays pinned while the rows scroll');
   assert.match(css, /\.rbuff__left \{/);
 });
 

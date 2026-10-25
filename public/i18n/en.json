@@ -1,5 +1,4 @@
 {
-  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "_meta": {
     "type": "lang",
     "lang": "en",
@@ -15,6 +14,7 @@
     "complete": true
   },
   "_about": "English UI strings: Chinese msgid → English (shared/i18n.js t(); docs/I18N.md). Placeholders {name} and {n|one|other} as in the msgid; a 'context::msgid' key is a tc() variant. Seeded from GitHub PR #70 (branch en-translation) by @YuriRestia, reused with credit (NOTICE.md). Game texts are not here: data/i18n/en.json (tools/build-i18n.mjs).",
+  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "你已在其他同盟中，请先离开当前同盟": "You are already in another Alliance. Leave it first.",
   "你已不在该同盟中": "You are no longer in this Alliance",
   "创建者已离开，同盟已解散": "The host left. The Alliance has been disbanded.",
@@ -2519,5 +2519,6 @@
   "已选择 → 送给{target}{pack}：{cards}": "Picked → gave {target} {pack}: {cards}",
   "选对面发对面包（1 减益 + 2 中性），选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）": "Picking an opponent deals an Opponent Pack (1 Debuff + 2 Neutral); picking yourself or a teammate deals an Ally Pack (1 Buff + 2 Neutral). An unchosen player gets the Default Pack (3 Neutral).",
   "选自己或队友发我方包（1 增益 + 2 中性）；没被选中的玩家拿默认包（3 中性）": "Picking yourself or a teammate deals an Ally Pack (1 Buff + 2 Neutral); an unchosen player gets the Default Pack (3 Neutral).",
-  "怪物词条只改本回合双方战场的敌人波次，不改赏金。": "A monster entry only changes this round's enemy waves on both battlefields; the bounty never changes."
+  "怪物词条只改本回合双方战场的敌人波次，不改赏金。": "A monster entry only changes this round's enemy waves on both battlefields; the bounty never changes.",
+  "被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。": "One pack per selection; an unchosen player gets the Default Pack (3 Neutral). No entry repeats until all 24 have been drawn."
 }

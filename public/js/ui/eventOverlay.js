@@ -347,7 +347,8 @@ export function EventOverlay({ pub, busy = false, onPick }) {
     const rosterRows = eventRosterRows(pub, ally, index);
     if (rosterRows.length) {
       return html`<${RosterPanel} title=${t('词条公示')} micro=${'ENTRIES // ' + t('词条公示')} tone="mint"
-        testid="event-roster" rows=${rosterRows} until=${Number(ally.roster.until) || Number(pub.deadline) || 0} />`;
+        testid="event-roster" rows=${rosterRows} until=${Number(ally.roster.until) || Number(pub.deadline) || 0}
+        note=${t('被选几次收几个包，没被选中的玩家拿默认包（3 中性）；整池 24 条词条抽完之前不会重复。')} />`;
     }
   }
 
