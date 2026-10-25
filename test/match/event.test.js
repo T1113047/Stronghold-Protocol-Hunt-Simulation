@@ -1,14 +1,14 @@
 // test/match/event.test.js — 2V2 事件期 (类肉鸽词条): the three ordered periods (contest round / +4 / R13), the four
 // targets (repeatable since 0.0.5), the 发包规则 (对面包 / 我方包 / 默认包, one pack per selection), the card-draw
-// no-repeat rule (per kind, match-global bag), every ally entry's effect (battle stats, deploy cap, income, refresh /
-// sell prices, placed-monster bounty, enemy move speed, SP, the environment buff bucket), the independent monster
-// channel (enemy-only mods, 赏金怪 inclusion without repricing, no repeats, unified odds) and the AI / timeout
-// auto-pick / server error codes.
+// no-repeat rule (the whole 24-entry pool, match-global bag), every ally entry's effect (battle stats, deploy cap,
+// income, refresh / sell prices, placed-monster bounty, enemy move speed, SP, the environment buff bucket), the
+// independent monster channel (enemy-only mods, 赏金怪 inclusion without repricing, no repeats, unified odds) and the
+// AI / timeout side roll / server error codes.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch } from './harness.js';
 import {
-  PHASE, ERR, EVENT_TARGETS, EVENT_CARDS, EVENT_ROSTER_MS, EVENT_PACK_KINDS, EVENT_PACK_SIZE,
+  PHASE, ERR, EVENT_TARGETS, EVENT_CARDS, EVENT_ROSTER_MS, EVENT_PACK_KINDS, EVENT_PACK_SIZE, EVENT_AI_OPP_CHANCE,
   EVENT_FOE_ODDS, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_FOE_ELITE_SHARES, EVENT_DURATION_ROUNDS,
 } from '../../shared/constants.js';
 import { validateC2S } from '../../shared/protocol.js';
@@ -171,8 +171,12 @@ describe('2V2 事件期: the periods, targets and packs', () => {
     assert.deepEqual(packs.get('ai_2').map((p) => p.kind), ['opp', 'own'], '对面 + 我方混合被选 = 两类包都收');
     assert.equal(packs.get('ai_1').length, 1);
     assert.equal(packs.get('ai_1')[0].kind, 'default', '未被选中 → 1 个默认包');
-    assert.deepEqual(packs.get('ai_1')[0].entries.map((e) => e.kind), [...EVENT_PACK_KINDS.default]);
+    assert.equal(packs.get('ai_1')[0].entries.length, EVENT_PACK_SIZE, '默认包仍是 3 条');
     assert.equal(packs.get('ai_1')[0].from, null, 'a default pack has no picker');
+    // 真·全局限一份 (维护者 2026-10-25): the four packs need 12 entries and the 中性 pool holds 7, so the last slots
+    // borrow an UNUSED card of another kind instead of repeating a card — no card repeats inside the period
+    const ids = [...packs.values()].flatMap((list) => list.flatMap((p) => p.entries.map((e) => e.card)));
+    assert.equal(new Set(ids).size, ids.length, 'no card repeats while the 24-entry pool still has an unused one');
     // the entries all landed on the receiver
     for (const pid of ['p_0', 'ai_1', 'ai_2', 'ai_3']) {
       const total = packs.get(pid).reduce((n, p) => n + p.entries.length, 0);
@@ -241,35 +245,37 @@ describe('2V2 事件期: the periods, targets and packs', () => {
     assert.ok(Math.abs(eventFoeEv() + 0.10) < 1e-12);
   });
 
-  test('the card draw: unused-of-kind first, the kind repeats only after ITS pool is exhausted (match-global bag)', () => {
+  test('the card draw: no repeat while the 24-entry pool has an unused card; an exhausted kind borrows another kind (match-global bag)', () => {
     const downIds = EVENT_CARDS.filter((c) => c.kind === 'down').map((c) => c.id).sort((a, b) => a - b);
     assert.equal(downIds.length, 5, 'the down pool');
+    assert.equal(EVENT_CARDS.length, 24, 'the 24-entry pool');
     const used = new Set();
     const draws = [];
     const rng = createRng(0xc0ffee);
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 30; i++) {
       const c = eventDrawAlly(rng, 'down', used);
       assert.ok(c, 'a draw always resolves');
       used.add(c.id);
       draws.push(c);
     }
-    assert.ok(draws.every((c) => c.kind === 'down'), 'a draw never leaves its kind');
     assert.deepEqual([...new Set(draws.slice(0, 5).map((c) => c.id))].sort((a, b) => a - b), downIds,
       'the first draws cover the kind pool with no repeats');
-    assert.equal(used.size, downIds.length, 'the match-global bag holds each down card once');
-    // once the kind is exhausted the draw repeats INSIDE the kind (down only has 5 cards — expected)
-    assert.ok(draws.slice(5).every((c) => downIds.includes(c.id)), 'exhausted kind repeats within itself');
-    // a cross-kind draw still prefers its own unused cards even though `down` is exhausted
-    const up = eventDrawAlly(rng, 'up', used);
-    assert.equal(up.kind, 'up');
-    assert.equal(used.has(up.id), false);
+    // 维护者 2026-10-25「真·全局限一份」: an exhausted kind borrows an UNUSED card of another kind instead of repeating
+    assert.equal(new Set(draws.slice(0, 24).map((c) => c.id)).size, 24, 'the whole pool is spent before anything repeats');
+    assert.equal(used.size, 24);
+    assert.ok(!draws.slice(5, 24).some((c) => c.kind === 'down'), 'a borrowed slot leaves the exhausted kind');
+    // only once all 24 are used does a draw repeat, and a repeat stays inside the requested kind
+    assert.ok(draws.slice(24).every((c) => c.kind === 'down'), 'an exhausted pool repeats within the requested kind');
+    assert.ok(draws.slice(24).every((c) => used.has(c.id)), 'a repeat only ever draws an already-used card');
+    // a kind that still has unused cards never leaves it
+    const fresh = new Set();
+    for (let i = 0; i < 3; i++) assert.equal(eventDrawAlly(createRng(9 + i), 'up', fresh).kind, 'up');
     // a pack marks every card it draws and keeps the composition order (distinctive card first)
     const usedPack = new Set();
     const pack = eventDrawPack(createRng(7), 'opp', usedPack);
     assert.equal(pack.length, EVENT_PACK_SIZE);
     assert.deepEqual(pack.map((c) => c.kind), [...EVENT_PACK_KINDS.opp]);
     assert.equal(usedPack.size, EVENT_PACK_SIZE);
-    assert.equal(EVENT_CARDS.length, 24, 'the 24-entry pool');
   });
 
   test('every entry applies at its BASE magnitude (the 自己 ×2 multiplier is gone)', () => {
@@ -905,20 +911,23 @@ describe('2V2 事件期: roster hold', () => {
 });
 
 describe('2V2 事件期: AI, timeout and server authority', () => {
-  test('AI seats spread the packs over the un-chosen 对面 seats, then 自己 (0.0.5; 超时同 AI)', () => {
+  test('AI seats roll their side (EVENT_AI_OPP_CHANCE), then spread over that side\'s un-chosen seats (0.0.5; 超时同 AI)', () => {
+    assert.equal(EVENT_AI_OPP_CHANCE, 60, '60 % 对面 / 40 % 我方');
+    const seats = () => ['p_0', 'p_1', 'p_2', 'p_3'].map((id) => h.ps(id));
+    // a roll under the chance aims at the opposing side: four bots, two per team, spread over the OTHER team's seats
     const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: botSeats(), seed: 11, fake: true }).start();
     const m = h.m;
     toEvent(h, m.eventRounds[0]);
-    // four bots, two per team: each team spreads its packs over the OTHER team's two seats (多名 bot 分散)
-    const ps = ['p_0', 'p_1', 'p_2', 'p_3'].map((id) => h.ps(id));
+    m.rngEventTarget = () => 0.01;
+    const ps = seats();
     assert.equal(m.botEventTarget(ps[0]), 'oppA', 'first: an un-chosen 对面 seat');
-    assert.deepEqual(m._eventPick(ps[0], m.botEventTarget(ps[0])), { ok: true });
+    assert.deepEqual(m._eventPick(ps[0], 'oppA'), { ok: true });
     assert.equal(m.botEventTarget(ps[1]), 'oppB', 'the second bot spreads to the other 对面 seat');
-    assert.deepEqual(m._eventPick(ps[1], m.botEventTarget(ps[1])), { ok: true });
+    assert.deepEqual(m._eventPick(ps[1], 'oppB'), { ok: true });
     assert.equal(m.botEventTarget(ps[2]), 'oppA', 'the other team targets ITS own opponents');
-    assert.deepEqual(m._eventPick(ps[2], m.botEventTarget(ps[2])), { ok: true });
+    assert.deepEqual(m._eventPick(ps[2], 'oppA'), { ok: true });
     assert.equal(m.botEventTarget(ps[3]), 'oppB');
-    assert.deepEqual(m._eventPick(ps[3], m.botEventTarget(ps[3])), { ok: true });
+    assert.deepEqual(m._eventPick(ps[3], 'oppB'), { ok: true });
     // every 对面 seat is taken this round → the fallback is 自己 (mate is never a bot's choice)
     assert.equal(m.botEventTarget(ps[0]), 'self');
     // the four picks dealt four 对面包 (1 减益 + 2 中性 each) — one per selection, no discount for bots
@@ -926,6 +935,19 @@ describe('2V2 事件期: AI, timeout and server authority', () => {
       const rec = [...m.event.picks.values()].find((r) => r.targetId === p.playerId);
       assert.equal(rec.packKind, 'opp', `${p.playerId} got a 对面包`);
     }
+    // a roll over the chance aims at its OWN side: an all-AI period then draws the 增益 pool (the 0.0.5 退化 fix)
+    const h2 = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: botSeats(), seed: 12, fake: true }).start();
+    const m2 = h2.m;
+    toEvent(h2, m2.eventRounds[0]);
+    m2.rngEventTarget = () => 0.99;
+    for (const p of m2.alivePlayers()) {
+      assert.equal(m2.botEventTarget(p), 'self', `${p.playerId} rolls its own side`);
+      assert.deepEqual(m2._eventPick(p, 'self'), { ok: true });
+    }
+    const kinds = new Set([...m2.event.picks.values()].map((r) => r.packKind));
+    assert.deepEqual([...kinds], ['own'], 'every pack of the period is a 我方包');
+    const upIds = new Set(EVENT_CARDS.filter((c) => c.kind === 'up').map((c) => c.id));
+    assert.ok([...m2.event.picks.values()].every((r) => upIds.has(r.card)), 'the 增益 pool is drawn, not never-seen');
   });
 
   test('a full bot match runs all three periods without stalling (unified elite share in each)', () => {

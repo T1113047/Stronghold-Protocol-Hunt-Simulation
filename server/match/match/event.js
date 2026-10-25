@@ -8,7 +8,8 @@
 //      (chosen N times → N packs; 对面包 on an oppA / oppB pick = 1 减益 + 2 中性, 我方包 on a self / mate pick = 1
 //      增益 + 2 中性 — EVENT_PACK_KINDS), drawn from EVENT_CARDS with the seeded `rngEvent` stream. A player chosen 0
 //      times receives ONE 默认包 (3 中性) when the period closes — the per-event floor. The used-card bag is
-//      match-global (shared across players and periods): a card is not drawn again while its kind has an unused one;
+//      match-global (shared across players and periods): no card repeats while the 24-entry pool still holds an unused
+//      one, so an exhausted kind borrows an unused card of another kind before anything repeats;
 //   2. the monster entry: drawn once when the period opens, on its own seeded stream (`rngFoeEvent`), independent of the
 //      target choices, with the unified foe odds (EVENT_FOE_ODDS). It merges into THAT round's wave (normal + 赏金怪,
 //      never a player's mods, never a bounty amount). Each period ALSO marks a share of that wave as 强力 with one extra
@@ -22,14 +23,15 @@
 // the accumulated log by the current round; startRound re-derives eventMods each round. History keeps every entry.
 //
 // The phase is timed (EVENT_PICK_SECONDS; always, also in a single-human versus room) and every botControlled seat picks
-// at once. A timeout — or a seat that never answers — is auto-picked by botEventTarget (an un-chosen opponent seat
-// first, spreading the packs; 自己 without an opponent side), so the phase can never stall. AIs and timeouts are dealt
+// at once. A timeout — or a seat that never answers — is auto-picked by botEventTarget (EVENT_AI_OPP_CHANCE % of those
+// picks aim at the opposing side, the rest at their own, and an un-chosen seat wins within the side — otherwise an
+// all-AI period would deal nothing but 对面包), so the phase can never stall. AIs and timeouts are dealt
 // the same packs as humans — never a discount.
 //
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import {
-  PHASE, ERR, EVENT_TARGETS, EVENT_PACK_SIZE, EVENT_PACK_KINDS, EVENT_PICK_SECONDS, EVENT_CARDS,
+  PHASE, ERR, EVENT_TARGETS, EVENT_PACK_SIZE, EVENT_PACK_KINDS, EVENT_PICK_SECONDS, EVENT_AI_OPP_CHANCE, EVENT_CARDS,
   EVENT_FOE_ODDS, EVENT_FOE_ELITE_SHARES, EVENT_FOE_CARDS, EVENT_FOE_ELITES, EVENT_ROSTER_MS, EVENT_DURATION_ROUNDS,
   COOP_HUNT,
 } from '../../../shared/constants.js';
@@ -65,18 +67,18 @@ function pickAny(rng, pool) {
 }
 
 /**
- * Draw the ally entry of a rolled kind without repeating a card of THIS match (0.0.5 需求 1.3 重复规则): first among the
- * match's unused cards of that kind (the used bag `usedMatch` is match-global — shared across players and periods),
- * then — once the kind's own pool is exhausted — any card of that kind again (the class-scoped refinement; the down
- * pool has only a few cards, so stacking packs repeats inside the kind first). Never crosses kinds: a kind whose pool
- * is exhausted repeats instead of borrowing another kind's card.
+ * Draw the ally entry of a rolled kind without repeating a card of THIS match (0.0.5 需求 1.3 重复规则, 维护者
+ * 2026-10-25 定为「真·全局限一份」): first among the match's unused cards of that kind, then — once that kind has no
+ * unused card left — an unused card of ANY kind (the pack keeps its 3-entry shape but the slot borrows another kind, so
+ * the neutral fillers of a 4-player period never repeat while the 24-card pool still holds one), and only after the
+ * whole pool is used does a card repeat (then inside its own kind, so a 减益 slot stays a 减益).
  * @param {() => number} rng
  * @param {'down'|'mid'|'up'} kind
  * @param {Set<number>} usedMatch cards already drawn this match
  */
 export function eventDrawAlly(rng, kind, usedMatch = new Set()) {
   const byKind = EVENT_CARDS.filter((c) => c.kind === kind);
-  return pickUnused(rng, byKind, usedMatch) ?? pickAny(rng, byKind);
+  return pickUnused(rng, byKind, usedMatch) ?? pickUnused(rng, EVENT_CARDS, usedMatch) ?? pickAny(rng, byKind);
 }
 
 /**
@@ -371,11 +373,11 @@ export class MatchEvent {
   }
 
   /**
-   * The AI's target (0.0.5 需求 1.4): spread the packs across the opponent side — an OPPOSING seat that has not been
-   * selected in THIS period yet comes first (several bots / auto-picks land on different seats), then 自己 when no
-   * un-chosen opponent is left (同盟狩猎 has no opponent side at all, so it always ends at 自己). `mate` is never a
-   * bot's choice [ASSUMED: the spec's fallback is 自己; a pick still has to resolve for a seat whose own side is gone,
-   * so a living mate is the last resort]. The timeout auto-pick runs exactly this rule (finishEvent).
+   * The AI's target (0.0.5 需求 1.4, 维护者 2026-10-25 定概率): the ROLLED side comes first (EVENT_AI_OPP_CHANCE %
+   * 对面, the rest 自己 / 队友) and within it the seat that has not been selected in THIS period comes first, so
+   * several bots spread their packs. Then the other side's un-chosen seat, then the pre-0.0.5 last resort — 自己,
+   * 队友, then the opponents. A room with no opposing side (同盟狩猎) never rolls and always ends on its own side.
+   * The timeout auto-pick runs exactly this rule (finishEvent).
    */
   botEventTarget(ps) {
     const map = this.eventTargetMap(ps);
@@ -387,12 +389,17 @@ export class MatchEvent {
     for (const rec of (this.event && this.event.picks ? this.event.picks.values() : [])) {
       if (rec && rec.targetId) taken.add(rec.targetId);
     }
-    for (const key of ['oppA', 'oppB']) {
-      const tp = usable(key);
-      if (tp && !taken.has(tp.playerId)) return key;
+    const OPP = ['oppA', 'oppB'];
+    const OWN = ['self', 'mate'];
+    const sides = OPP.some((k) => usable(k)) && this.rngEventTarget() * 100 < EVENT_AI_OPP_CHANCE ? [OPP, OWN] : [OWN, OPP];
+    for (const side of sides) {
+      for (const key of side) {
+        const tp = usable(key);
+        if (tp && !taken.has(tp.playerId)) return key;
+      }
     }
-    if (usable('self')) return 'self';
-    return usable('mate') ? 'mate' : null;
+    for (const key of [...OWN, ...OPP]) if (usable(key)) return key;
+    return null;
   }
 
   /**

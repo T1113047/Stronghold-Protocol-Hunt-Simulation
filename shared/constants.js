@@ -246,8 +246,9 @@ export const teamOfSeat = (seat) => Math.floor(seat / TEAM_SIZE) % TEAMS;
  *   2. the MONSTER entry: drawn once per event, independent of the target choices (its own seeded stream), with the
  *      unified foe odds (EVENT_FOE_ODDS) and 强力属性 share range (EVENT_FOE_ELITE_SHARES), applied to that round's
  *      wave — enemy mods only, never a player's mods, never a bounty amount.
- * The entries are pure data (no display text: the UI slice adds the i18n names). Draws never repeat a card while its
- * kind still has an unused one in the match-wide bag (server/match/match/event.js eventDrawAlly).
+ * The entries are pure data (no display text: the UI slice adds the i18n names). Draws never repeat a card while the
+ * match-wide 24-card bag still holds an unused one — the whole pool, not just the slot's own kind (server/match/match/
+ * event.js eventDrawAlly: unused of the kind → unused of any kind → a repeat).
  */
 /** The last event period: R13, the 最终狩猎 (a normal hunt round, never a boss round). */
 export const EVENT_FINAL_ROUND = 13;
@@ -294,6 +295,13 @@ export const EVENT_PACK_KINDS = Object.freeze({
 export const EVENT_DURATION_ROUNDS = 4;
 /** The event phase's selection window in seconds (a timed-out seat is auto-picked by EV: botEventTarget). */
 export const EVENT_PICK_SECONDS = 20;
+/**
+ * The chance (percent) an AI / auto-picked seat aims at the OPPOSING side (0.0.5 需求 1.4, 维护者 2026-10-25): the rest
+ * goes to its own side (自己 / 队友). Without it every bot and every timeout picks an opponent, so an all-AI period
+ * deals only 对面包 and the 12-card 增益 pool is never drawn. Within the chosen side the seat still un-chosen this
+ * period comes first; a room with no opposing side (同盟狩猎) always ends on its own side. One line to tune.
+ */
+export const EVENT_AI_OPP_CHANCE = 60;
 /**
  * The monster-channel odds, UNIFIED across the three periods (0.0.5: the per-sequence rows are gone — every period
  * draws the monster entry at 25 / 40 / 35, from OUR side (favor = weakens the enemies), expectation −0.10).

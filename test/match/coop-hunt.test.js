@@ -314,8 +314,11 @@ describe('同盟狩猎: the 事件期 has only self / mate', () => {
     // 0.0.5: the one-target-per-match limit is gone everywhere — a used target stays offered and may repeat
     ps.eventTargets.push('mate');
     assert.deepEqual(m.eventAvailableTargets(ps), ['self', 'mate']);
-    // a co-op bot has no 对面 side at all: botEventTarget falls back to 自己
-    assert.equal(m.botEventTarget(ps), 'self');
+    // a co-op bot has no 对面 side at all, so it never rolls and stays on its own side: an un-chosen seat first (自己,
+    // then 队友) — p_0 already chose itself this period, so its own spread lands on the mate (0.0.5 维护者 2026-10-25)
+    assert.equal(m.botEventTarget(ps), 'mate', '已被选过的自己 → 同侧未选过的队友');
+    const other = m.alivePlayers().find((p) => p !== ps);
+    assert.equal(m.botEventTarget(other), 'self', '没被选过的座位仍然选自己');
     // the monster channel still runs (the 2V2 entries / 强力属性 apply to the co-op wave)
     assert.ok(m.foeEvent && m.foeEvent.card, 'a monster entry is drawn for the event');
     assert.ok(m.foeWaveSpawns([{ enemyKey: 'enemy_1007_slime', count: 2, mods: {} }]).length > 0);

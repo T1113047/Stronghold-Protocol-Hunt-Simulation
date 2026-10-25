@@ -432,6 +432,8 @@ export class Match {
     this.rngCoopHunt = rng('coop-hunt');
     // 2V2 事件期: the type / entry draws (its own stream too — golden scenarios never enter the event phase)
     this.rngEvent = rng('event');
+    // 2V2 事件期: which side an AI / timeout seat aims at (EVENT_AI_OPP_CHANCE; its own stream so the entry draws never shift)
+    this.rngEventTarget = rng('event-target');
     // the monster entry's own stream: independent of the players' target choices (EVENT_FOE_CARDS)
     this.rngFoeEvent = rng('event-foe');
     // the 强力属性 subset's stream: share / attribute / which units (EVENT_FOE_ELITES)
