@@ -173,6 +173,20 @@ and before Ready. The prep's deadline — and the scheduler's fallback when a st
 
 Deterministic-ish heuristic player used for (a) AI teammates, (b) auto-play for disconnected humans (only auto-ready + auto-picks, not shopping, unless "AI 托管" is toggled), (c) tests. Strategy (§21.6): pick a band (weighted by starting LP; never one built around a bond the mode switches off — `gd.bandBondIds`, §21.26); each prep: take offers, sell dead bench weight, fill the board, complete affordable merges, level on the curve, then buy only merge progress / lineup upgrades worth more than the refreshes their price would buy (shop odds of completing held pairs), freeze for an unaffordable third copy (坎诺特 keeps 5 funds back); build around a committed focus core bond (a teammate's main bond on its strip counts against it; bonds the mode switches off never) + a second bond; value dealers by DPS vs the round's DEF / RES (an attack on every enemy in range counts double — 阵法术师 / 轰击术师), with the range the unit is deployed with; place by the exposure model + rehearsal on the server's deploy map (no 深水区; a blocker whose range is its own tile only — range 0-1 — takes a free tile of the enemy road first; a tactician's 援军 within `PlayerState.summonRange`; a melee chess whose trait reads 「可以放置于远程位」 (钩索师 / 推击手) on a 高台 whose range covers the enemy road, else on the ground, counted as a blocker in the lineup either way — §3; `g.move` judges legality); items by effect (META §1.5: 突变细胞 on the least valuable normal single below 6阶, a cell left in temp gets a hand slot made for it, the operator its transformation gains is deployed by the next prep's lineup step like any owned unit — AI 托管 too; the buy loop's bench shed never sells a piece gained since the bot's last prep, §21.1); 机变 bounties by expected payout − expected LP loss over the offered cards; resolve temp — on a human seat under AI 托管 never by destroying an item while a bench operator can be sold for the slot —; ready. A bot's whole prep — shop decisions and layout planning (`botPrepBeginSteps`, 25–70 ms late in a 4-bot match), the layout rehearsal and `botPrepEndSteps` — runs in wall-clock slices of `botSliceMs` (8 ms) per scheduler callback on a real host (step generators that yield between whole actions, never with a transient board; the same actions in the same order, so decisions are unchanged; at once in virtual time). Under AI 托管 a human's own 自选 pieces score `DIY_PIECE_BONUS` (12) more in the shop / reward choice and the 调度中心 is levelled one round earlier for the step that opens a slotted tier (`levelUp`, `diyOpensAt`; 0.2.0 — bots field no 自选 piece).
 
+**The 狩猎期 placement of a bot seat is a counter, not a greedy fill** (「猎手 AI」/ the AI 狩猎模式, 0.0.5, rule in §35.15):
+`server/match/match/aiHunter.js` answers the fielding of the seat the bot aims at — which opponent, which monsters (a
+`特性 → 短板` score per candidate, ranked by `(score + 1) / value`), which gate, and which insertion slot (`front` presses a
+thin board, `back` lands after a wall has spent its block), and only the strongest tier may fill the 事件期 boss 格. It
+changes the CHOICE only: the same `confrontBudget()`, the same `confrontGroups()` pool, the same `maxPicks` /
+`confrontBossCap()` and `positions`, and the finished plan is handed back through the human gate `confront.js
+_confrontMember` — a plan it refuses is dropped and `botConfront` keeps the pre-0.0.5 value-descending greedy fill
+(that fill is also what a `FUNNY` match always gets: the tier dial is bound to the difficulty, `AI_HUNT.tier`). The
+read-out is the target's board and the round's wave only (`boardReadout(gd, board)`: hand, shop, funds and the 坎诺特
+balance are not in the signature); equipment and 特质 are not modelled. Draws come from the seeded `rngAiHunt` stream
+and a `key` tiebreak, so a hunt replays; `server/sim/` is untouched, so a BattleSpec still simulates identically. The
+two dispatch points are `assignConfrontTarget` (the target) and `botConfront` (the submission); nothing else in `bot.js`
+knows about it.
+
 ---
 
 ## 16. Operator loadout: skill & module selection (v2.1, user playtest #1)
