@@ -288,7 +288,7 @@ server {
 
 **迁移到域名 + HTTP/2 后**：补丁**可以留着**（预热与复用仍然省流量），但建议按 `git grep TEMP-HTTP2` 逐处回退到上游形状（15 s 预算、`/sim/` 直连、每场新建 Worker），把「慢链路怎么办」这件事重新交回给 HTTP/2 与代理缓存。回退时同时删掉本节与 `docs/design/network.md` 里的对应段落。
 
-**B 中继（盟约服的 nginx 缓存）**：`/v…` 不匹配 `location ~ ^/(js|css|shared|sim)/`，会落到兜底 `location /`（60 s + 重校验）；中继自己的缓存忽略 `Cache-Control`，但响应头照样透传给浏览器，所以浏览器的长期缓存不受影响 —— 不需要为这个补丁改中继配置。`warm-list.txt` 里的 `/sim/*` 仍是原路径，继续有效。
+**B 中继（另一台前置机器的 nginx 缓存）**：`/v…` 不匹配 `location ~ ^/(js|css|shared|sim)/`，会落到兜底 `location /`（60 s + 重校验）；中继自己的缓存忽略 `Cache-Control`，但响应头照样透传给浏览器，所以浏览器的长期缓存不受影响 —— 不需要为这个补丁改中继配置。`warm-list.txt` 里的 `/sim/*` 仍是原路径，继续有效。
 
 **压缩**：服务器自己压缩脚本、样式、数据和 Spine 的 `.skel` / `.atlas`：浏览器支持 brotli 时用 brotli（0.2.6 起，质量 5，比 gzip 快且更小：实测 `.skel` 小约 27%、游戏数据 JSON 小约 26%、前端库小约 14%、脚本小约 5%），否则用 gzip；图片和音频本来就是压缩格式，原样发送。浏览器只在 HTTPS 页面（以及 `localhost`）上声明支持 brotli，所以通过代理或隧道的 https 地址访问时用 brotli，局域网里的 `http://192.168.x.x:3000` 这类地址用 gzip。代理不需要另开压缩（Caddy 的 `encode`、Nginx 的 `gzip` 遇到已经压缩的响应会跳过）。
 
