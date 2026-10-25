@@ -591,7 +591,8 @@ export class MatchEvent {
 
   /**
    * Draw the period's 强力属性 subset: a share from EVENT_FOE_ELITE_SHARES (15 %~20 % in every period since 0.0.5),
-   * one attribute from EVENT_FOE_ELITES, and `count = max(1, round(share × the carded normal wave's monster count))`.
+   * one attribute from EVENT_FOE_ELITES, and `count = max(1, round(share × the carded normal wave's monster count))`
+   * — zero when that wave holds nothing, so the announcement never promises a monster that cannot spawn.
    * Seeded `rngFoeElite` (share, then attribute); WHICH units are marked is decided by spawn order at application time
    * (foeEliteSpawns), never by Math.random.
    */
@@ -602,7 +603,8 @@ export class MatchEvent {
     const attr = attrs[Math.max(0, Math.min(attrs.length - 1, Math.floor(this.rngFoeElite() * attrs.length)))];
     const carded = this.foeEventSpawns(this.wave && Array.isArray(this.wave.spawns) ? this.wave.spawns : []);
     const total = carded.reduce((n, s) => n + (s && s.tag !== 'bounty' ? Math.max(1, Math.trunc(Number(s.count) || 1)) : 0), 0);
-    const count = Math.max(1, Math.round(share * total));
+    // an empty normal wave marks nothing, and the announcement must not promise a monster that cannot exist
+    const count = total > 0 ? Math.max(1, Math.round(share * total)) : 0;
     const mods = {};
     for (const k of ['atkMul', 'hpMul', 'defMul', 'speedMul']) if (Number.isFinite(attr[k]) && attr[k] > 0) mods[k] = attr[k];
     return { share, attr: attr.key, count, mods };

@@ -237,3 +237,8 @@ test('0.0.5 文案复审: every seat carries its number, multi-pack rows say whi
     for (const l of LANGS) assert.equal(PACK[l][dead], undefined, `${l}: ${dead} is no longer rendered anywhere`);
   }
 });
+
+test('公示行的长玩家名不撑破版：包归属与「来自」一段走 ellipsis', () => {
+  assert.match(CSS, /\.rospov__verb \{[^}]*text-overflow: ellipsis; white-space: nowrap/, 'a 12-char name cannot push the row to two lines');
+  assert.match(CSS, /\.rospov__name[^}]*text-overflow: ellipsis/, 'the receiver name keeps its own bound');
+});

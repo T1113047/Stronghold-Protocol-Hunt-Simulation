@@ -1000,3 +1000,18 @@ describe('2V2 事件期: AI, timeout and server authority', () => {
     p0.alive = true;
   });
 });
+
+describe('2V2 事件期: the 强力属性 on an empty wave', () => {
+  test('a wave that holds nothing announces 0 marked monsters (never a phantom 共 1 只)', () => {
+    const h = makeMatch({ mode: 'versus', difficulty: 'FUNNY', seats: vsSeats(), seed: 31, fake: true }).start();
+    toEvent(h, h.m.eventRounds[0]);
+    const m = h.m;
+    const saved = m.wave;
+    m.wave = { ...saved, spawns: [] };
+    assert.equal(m._drawFoeElite().count, 0, 'nothing on the wave, nothing promised');
+    assert.deepEqual(m.foeEliteSpawns([]), [], 'the applied list stays empty');
+    m.wave = saved;
+    assert.ok(m._drawFoeElite().count >= 1, 'a real wave still marks at least one');
+    m.dispose();
+  });
+});

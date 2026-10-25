@@ -1029,7 +1029,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .rospov__name { max-width: 2.2rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #eafff8; }
 .rospov__sep { color: var(--text-lo); }
 .rospov__cat { color: var(--gold-2); font-weight: 700; }
-.rospov__verb { color: var(--text-dim); }
+.rospov__verb { color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rospov__eff { margin-left: .1rem; color: var(--mint-400); }
 .confclash__count { font-size: calc(.14 * var(--t)); font-weight: 700; color: var(--text-md); white-space: nowrap; }
 
