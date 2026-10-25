@@ -78,6 +78,7 @@ import { resolveRecordLoadout, loadoutRecord, attackRangeGrid } from '../shared/
 import { diyRecordOf, DIY_TIERS } from '../shared/diy.js';
 import { unitForm } from '../shared/standIn.js';
 import { POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../shared/potential.js';
+import { teamOfSeat } from '../shared/constants.js';
 import { OPERATOR_KITS, KITTED_CHARS } from '../server/sim/content/kits/index.js';
 import { GEO } from '../shared/constants.js';
 
@@ -729,6 +730,12 @@ export function matchScenarios() {
   // A player without any NORMAL operators must use stand-ins regardless of which operators its AI buys.
   out.push({ id: 'coop2-NORMAL-1-unowned-roster', mode: 'coop', difficulty: 'NORMAL', bots: 1, seed: 1,
     human: { notOwned: STANDIN_CHESS.filter((c) => !c.isGolden).map((c) => c.chessId) } });
+  // 2V2 ('versus'), added 2026-10-25 with the 猎手 AI work: the family had NO versus scenario before, so the 对抗期
+  // 投放、事件期、boss 格、鸭爵特殊怪、联防 field、R14 最终攻势 / R15 隐秘核心 and the 4:5 time judgement were never
+  // locked by a digest. Four AI seats = two teams of two (seats carry their team, see runMatch).
+  for (const [difficulty, seeds] of [['FUNNY', [21, 22]], ['NORMAL', [23, 24]], ['HARD', [25, 26]], ['ABYSS', [27, 28]]]) {
+    for (const seed of seeds) out.push({ id: `versus-${difficulty}-${seed}`, mode: 'versus', difficulty, bots: 4, seed });
+  }
   const humanAbout = (h) => (h.notOwned ? ` + 1 human seat (AI 托管) without ${h.notOwned.length} operators (补位 stand-ins)`
     : ` + 1 human seat (AI 托管) with ${Object.keys(h.diy || {}).length} 自选 picks${h.shopLevel ? ` and its 调度中心 at level ${h.shopLevel} from the first prep` : ''}`);
   return out.map((m) => ({ ...m, family: 'matches', kind: 'match', about: `${m.mode} ${m.difficulty}, ${m.bots} bot seat(s)${m.human ? humanAbout(m.human) : ''}, seed ${m.seed}${m.clientCombat === false ? ', server-run combat' : ''}${m.boost ? `, LP ${m.boost.lp} and ${m.boost.layers} layers per bond from the first prep` : ''}` }));
@@ -771,16 +778,21 @@ const MATCH_ROW_COLS = Object.freeze(['alive', 'lp', 'prepFunds', 'funds', 'pend
 export function runMatch(cfg) {
   const sched = new VirtualScheduler();
   const seats = [];
+  // 2V2 seats carry their team exactly as server/lobby.js hands them (teamOfSeat): without it every seat lands in
+  // team 0 and a 'versus' scenario silently plays as a co-op field — the 对抗期, the per-team pool / bans / boss pool
+  // and the R14/R15 team judgement would never run.
+  const teamOf = () => (cfg.mode === 'versus' ? { team: teamOfSeat(seats.length) } : {});
   // a human seat (cfg.human): offline (its battles run on the server) and on AI 托管 from the start; its not-owned chess
   // fight as their 补位 stand-ins, its 自选 picks join its shop
   if (cfg.human) {
     seats.push({
       seat: 0, playerId: 'h_0', name: 'H-1', isBot: false, connected: false,
+      ...teamOf(),
       ...(cfg.human.notOwned ? { notOwned: [...cfg.human.notOwned] } : null),
       ...(cfg.human.diy ? { diy: JSON.parse(JSON.stringify(cfg.human.diy)) } : null),
     });
   }
-  for (let i = 0; i < cfg.bots; i++) seats.push({ seat: seats.length, playerId: `ai_${i}`, name: `AI-${i + 1}`, isBot: true, connected: true });
+  for (let i = 0; i < cfg.bots; i++) seats.push({ seat: seats.length, playerId: `ai_${i}`, name: `AI-${i + 1}`, isBot: true, connected: true, ...teamOf() });
   let summary = null;
   const logged = [];
   const log = { info() {}, debug() {}, warn() {}, error: (...a) => logged.push(a.map(String).join(' ').slice(0, 120)) };
@@ -1026,7 +1038,7 @@ const ABOUT = {
   roster: 'every visible chess record × every selectable skill / module, every stage, every non-leader enemy kind, items, bands, 机变 cards, map cards, placeable summons',
   bonds: 'every bond at its activation threshold (layers 1) and at its top tier (layers 999)',
   fields: 'Final Assault / Hidden Core leaders (pair + solo templates, shared pool, 200 s cap) and 联防 fields (1 / 2 helpers)',
-  matches: 'matches run to the end in virtual time: bot-only (solo ×4 difficulties ×2 seeds, co-op 2/3/4, one server-run, two boosted to the Hidden Core) and one co-op match whose human seat fields 补位 stand-ins',
+  matches: 'matches run to the end in virtual time: bot-only (solo ×4 difficulties ×2 seeds, co-op 2/3/4, one server-run, two boosted to the Hidden Core), one co-op match whose human seat fields 补位 stand-ins, and 2V2 (versus ×4 difficulties ×2 seeds: two teams of two AI seats — the 对抗期 投放、事件期、boss 格、鸭爵、联防 fields、R14/R15 and the 4:5 time judgement all run)',
   standins: 'every NORMAL chess record (normal + elite) fielded as its 补位 stand-in (all 17 stand-ins and the skills the chess name for them), 12 per battle on real stages and waves',
   diy: '自选 pieces: every kitted owned 6★ × form (tiers 5 / 6, normal / elite × module) × skill, every kitted prototype at its locked selection',
 };
