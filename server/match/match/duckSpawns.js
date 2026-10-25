@@ -21,10 +21,11 @@
 // Wiring: server/match/match/combat.js `_normalOpts` (after the wave's own transforms — the last insert, like the
 // 同盟狩猎 prey), never event.js.
 //
-// Randomness: one match-level seeded stream (server/sim/rng.js, built exactly like server/match/Match.js's rng('…')
-// streams — created lazily here because Match.js constructs its own streams at construction; name 'duck-spawns'), so
-// every draw is deterministic and golden-reproducible. A bot-rehearsal PREVIEW draws from a clone of the stream (the
-// rngConfront pattern of combat.js), so a rehearsal shows the battle's duck without moving the real draw.
+// Randomness: one seeded stream PER SEAT (server/sim/rng.js, built like server/match/Match.js's rng('…') streams —
+// created lazily here because Match.js constructs its own streams at construction; salt 'duck-spawns:<playerId>'), so
+// every draw is deterministic and golden-reproducible and one seat's draw never moves another's. A bot-rehearsal or HUD
+// PREVIEW draws from a clone of that seat's stream (the rngConfront pattern of combat.js), so a preview shows that
+// seat's own duck without moving the real draw.
 
 import { createRng, deriveSeed } from '../../sim/rng.js';
 
@@ -50,10 +51,19 @@ export function duckRound(match) {
   return !!match && Array.isArray(match.eventRounds) && match.eventRounds.includes(match.round);
 }
 
-/** The match's duck stream, created on first use. A preview gets a clone: it never moves the real draw. */
-function duckRng(match, preview) {
-  if (!match.rngDuckSpawns) match.rngDuckSpawns = createRng(deriveSeed(match.seed, DUCK_STREAM));
-  return preview && typeof match.rngDuckSpawns.clone === 'function' ? match.rngDuckSpawns.clone() : match.rngDuckSpawns;
+/**
+ * The seat's own duck stream, created on first use (salted by playerId), so a seat's draw never moves another's and a
+ * preview clone shows exactly the enemy that seat's next battle mixes in. A single match-wide stream made every seat's
+ * preview show the first seat's duck (维护者 2026-10-25).
+ */
+function duckRng(match, ps, preview) {
+  if (!match.rngDuckSpawns) match.rngDuckSpawns = new Map();
+  let stream = match.rngDuckSpawns.get(ps.playerId);
+  if (!stream) {
+    stream = createRng(deriveSeed(match.seed, `${DUCK_STREAM}:${ps.playerId}`));
+    match.rngDuckSpawns.set(ps.playerId, stream);
+  }
+  return preview && typeof stream.clone === 'function' ? stream.clone() : stream;
 }
 
 /**
@@ -90,7 +100,7 @@ export function duckSpawnsFor(match, ps, spawns, { preview = false } = {}) {
   if (!duckRound(match) || !Array.isArray(spawns) || !ps) return spawns;
   const pool = duckPool(match.gd).filter((k) => match.gd.enemy(k));
   if (!pool.length) return spawns;
-  const rng = duckRng(match, preview);
+  const rng = duckRng(match, ps, preview);
   const enemyKey = rng.pick(pool); // "同一随机方式": the strategy's own `rng.pick` over the same pool
   // [ASSUMED] placement ("波次夹杂"): one random wave unit's own slot — the strategy writes its swaps "at the replaced
   // unit's time and route" (duckReplace), and here the duck is ADDED (nothing is replaced), in the same spec style

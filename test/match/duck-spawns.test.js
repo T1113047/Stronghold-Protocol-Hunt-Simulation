@@ -185,6 +185,30 @@ test('deterministic (seeded stream): the same match replays the same duck; a reh
   b.m.dispose();
 });
 
+test('每个座位预览自己的鸭: a seat\'s preview is that seat\'s own draw, never the first seat\'s', () => {
+  const { m } = versusAtEventPrep(5150);
+  const wave = [{ time: 2, enemyKey: 'enemy_1000_gopro_2', routeIndex: 0, count: 3, interval: 1, mods: {} }];
+  const duckOf = (list, pid) => {
+    const d = list.find((s) => s.tag === DUCK_TAG);
+    assert.ok(d, 'the duck');
+    assert.equal(d.bounty.ownerPlayerId, pid, 'the bounty stays the seat\'s own');
+    return `${d.enemyKey}@${d.time}r${d.routeIndex}`;
+  };
+  const seats = ['p_0', 'ai_1', 'ai_2', 'ai_3'].map((id) => m.players.get(id));
+  const peek = (p) => duckOf(duckSpawnsFor(m, p, wave, { preview: true }), p.playerId);
+  const shown = seats.map(peek);
+  assert.ok(new Set(shown).size > 1, 'the four seats do not all preview one duck (the 0.0.5 bug)');
+  for (let i = 0; i < 2; i++) assert.deepEqual(seats.map(peek), shown, 'a preview never advances a stream');
+  // the preview clone sits exactly where that seat's real draw will be
+  assert.equal(duckOf(duckSpawnsFor(m, seats[0], wave), 'p_0'), shown[0], 'the preview showed the real draw');
+  // one seat's battle moves only its own stream
+  const after = seats.slice(1).map(peek);
+  assert.deepEqual(after, shown.slice(1), 'the other seats are untouched by p_0\'s battle');
+  assert.notEqual(peek(seats[0]), shown[0], "that seat's stream moved on");
+  assert.deepEqual(seats.slice(1).map(peek), shown.slice(1), 'and still only its own');
+  m.dispose();
+});
+
 test('同盟狩猎 gets one per player too; solo has no 事件期 round and no duck', () => {
   const h = makeMatch({ mode: 'coop', difficulty: 'NORMAL', humans: 1, bots: 3, fake: true, seed: 909 }).start();
   h.autoHumans();

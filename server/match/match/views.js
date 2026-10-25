@@ -415,8 +415,8 @@ export class MatchViews {
     const bounty = bountySpawns(this.gd, this.round, this.wave, ps.bounties, ps.playerId, { solo: this.isSolo });
     // 2V2 事件期: the round's monster card + 强力属性 subset (the preview's counts/flags must match the battle)
     // 同盟狩猎: the system's prey is appended last, exactly as _normalOpts inserts it
-    // 事件期 rounds: the 鸭爵 special enemy last, exactly as _normalOpts inserts it (preview:true — a clone of the
-    // duck stream, so the HUD never moves the battle's real draw)
+    // 事件期 rounds: the 鸭爵 special enemy last, exactly as _normalOpts inserts it (preview:true — a clone of THIS
+    // SEAT's duck stream, so the HUD shows that seat's own duck and never moves the battle's real draw)
     let list = this.foeWaveSpawns([...this.wave.spawns, ...bounty]);
     if (this.coopHuntActive()) list = this.applyCoopHunt(list, ps);
     list = duckSpawnsFor(this, ps, list, { preview: true });
