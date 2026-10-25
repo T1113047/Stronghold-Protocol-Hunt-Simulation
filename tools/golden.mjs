@@ -881,9 +881,21 @@ export function runMatch(cfg) {
     return summary != null;
   }, { maxSteps: 5e6 });
   const rng = {};
-  for (const [name, key] of [['setup', 'rngSetup'], ['shop', 'rngShop'], ['waves', 'rngWaves'], ['draft', 'rngDraft'], ['bots', 'rngBots'], ['meta', 'rngMeta']]) {
+  // K6 (维护者 2026-10-25): EVERY stream a match owns is counted, not only the six the 0.2.x table listed — a draw that
+  // moved from one stream to another (事件期 / 对抗期 / 鸭爵 / 猎手) was invisible here, and the streams are exactly what
+  // a determinism regression looks like.
+  for (const [name, key] of [
+    ['setup', 'rngSetup'], ['shop', 'rngShop'], ['waves', 'rngWaves'], ['draft', 'rngDraft'], ['bots', 'rngBots'], ['meta', 'rngMeta'],
+    ['confront', 'rngConfront'], ['confront-types', 'rngConfrontTypes'], ['coop-hunt', 'rngCoopHunt'],
+    ['event', 'rngEvent'], ['event-foe', 'rngFoeEvent'], ['event-elite', 'rngFoeElite'], ['event-target', 'rngEventTarget'],
+    ['ai-hunt', 'rngAiHunt'],
+  ]) {
     rng[name] = m[key] && typeof m[key].state === 'function' ? rngDraws(deriveSeed(m.seed, name), m[key].state()) : null;
   }
+  // the 鸭爵 stream is per seat (duckSpawns.js, salted by playerId): the SUM of its draws is what the digest can express
+  // without making the key set depend on how many seats a scenario has
+  rng['duck-spawns'] = m.rngDuckSpawns instanceof Map ? [...m.rngDuckSpawns.entries()].reduce((n, [pid, s]) => (
+    n + (s && typeof s.state === 'function' ? rngDraws(deriveSeed(m.seed, `duck-spawns:${pid}`), s.state()) : 0)), 0) : null;
   const s = summary || {};
   const players = {};
   for (const p of s.players || []) {

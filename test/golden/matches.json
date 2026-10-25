@@ -17,7 +17,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_5","hiddenBossId":null,"factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":9,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":27,"bossPoolLeft":0,"virtualMs":68100},
-      "rng": {"setup":16,"shop":87,"waves":0,"draft":0,"bots":5205,"meta":0},
+      "rng": {"setup":16,"shop":87,"waves":0,"draft":0,"bots":5205,"meta":0,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"fb1c9c04",0,"preciShip 0/2",4,4,0,4]},
@@ -57,7 +57,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_5","hiddenBossId":null,"factions":["ELEMENT","DOT","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":9,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":27,"bossPoolLeft":0,"virtualMs":68100},
-      "rng": {"setup":16,"shop":154,"waves":0,"draft":0,"bots":5211,"meta":39},
+      "rng": {"setup":16,"shop":154,"waves":0,"draft":0,"bots":5211,"meta":39,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,29,4,0,0,1,2,"646a0f4a",0,"yanShip 0/1",5,5,0,4]},
@@ -103,7 +103,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_8","factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":12,"bossPoolLeft":0,"virtualMs":106900},
-      "rng": {"setup":25,"shop":159,"waves":0,"draft":10,"bots":8211,"meta":1},
+      "rng": {"setup":25,"shop":159,"waves":0,"draft":10,"bots":8211,"meta":1,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"cc1bac8f",0,"sargonShip 0/2, soloShip 1/0",5,5,0,4]},
@@ -172,7 +172,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m02","bossId":"boss_5","hiddenBossId":"boss_10","factions":["ELEMENT","DOT","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":29,"bossPoolLeft":0,"virtualMs":106900},
-      "rng": {"setup":25,"shop":283,"waves":0,"draft":10,"bots":10182,"meta":84},
+      "rng": {"setup":25,"shop":283,"waves":0,"draft":10,"bots":10182,"meta":84,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,29,4,0,0,1,2,"cab906b4",0,"",5,5,0,4]},
@@ -247,7 +247,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_8","factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":false,"roundsPassed":13,"hiddenReached":false,"hiddenCleared":false,"reason":"defeat","teamLp":0,"bossPoolLeft":301430,"virtualMs":107800},
-      "rng": {"setup":25,"shop":215,"waves":0,"draft":42,"bots":8070,"meta":1},
+      "rng": {"setup":25,"shop":215,"waves":0,"draft":42,"bots":8070,"meta":1,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"cc1bac8f",0,"sargonShip 0/2, soloShip 1/0",5,5,0,4]},
@@ -316,7 +316,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_10","factions":["ELEMENT","DOT","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":29,"bossPoolLeft":0,"virtualMs":107800},
-      "rng": {"setup":25,"shop":265,"waves":0,"draft":42,"bots":8538,"meta":84},
+      "rng": {"setup":25,"shop":265,"waves":0,"draft":42,"bots":8538,"meta":84,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,29,4,0,0,1,2,"ae2ff2ff",0,"",5,5,0,4]},
@@ -385,7 +385,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_8","factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":false,"roundsPassed":13,"hiddenReached":false,"hiddenCleared":false,"reason":"defeat","teamLp":0,"bossPoolLeft":2819554,"virtualMs":107800},
-      "rng": {"setup":25,"shop":215,"waves":0,"draft":42,"bots":8070,"meta":1},
+      "rng": {"setup":25,"shop":215,"waves":0,"draft":42,"bots":8070,"meta":1,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,27,4,0,0,1,2,"cc1bac8f",0,"sargonShip 0/2, soloShip 1/0",5,5,0,4]},
@@ -454,7 +454,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_10","factions":["ELEMENT","DOT","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":13,"hiddenReached":false,"hiddenCleared":false,"reason":"defeat","teamLp":0,"bossPoolLeft":2175584,"virtualMs":107800},
-      "rng": {"setup":25,"shop":280,"waves":0,"draft":42,"bots":8402,"meta":91},
+      "rng": {"setup":25,"shop":280,"waves":0,"draft":42,"bots":8402,"meta":91,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"ai_0":[1,29,4,0,0,1,2,"ae2ff2ff",0,"",5,5,0,4]},
@@ -523,7 +523,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m04","bossId":"boss_3","hiddenBossId":"boss_8","factions":["FLY","TIMES","DOT"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":61,"bossPoolLeft":0,"virtualMs":173400},
-      "rng": {"setup":25,"shop":538,"waves":0,"draft":40,"bots":21946,"meta":23},
+      "rng": {"setup":25,"shop":538,"waves":0,"draft":40,"bots":21946,"meta":23,"confront":0,"confront-types":49,"coop-hunt":71,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":10},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -634,7 +634,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m04","bossId":"boss_4","hiddenBossId":"boss_10","factions":["FLY","TIMES","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":12,"hiddenReached":false,"hiddenCleared":false,"reason":"eliminated","teamLp":null,"bossPoolLeft":null,"virtualMs":170300},
-      "rng": {"setup":25,"shop":410,"waves":0,"draft":73,"bots":13595,"meta":5},
+      "rng": {"setup":25,"shop":410,"waves":0,"draft":73,"bots":13595,"meta":5,"confront":0,"confront-types":56,"coop-hunt":67,"event":15,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":8},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -745,7 +745,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m03","bossId":"boss_4","hiddenBossId":"boss_9","factions":["FLY","TIMES","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":13,"hiddenReached":false,"hiddenCleared":false,"reason":"defeat","teamLp":0,"bossPoolLeft":1253704,"virtualMs":180650},
-      "rng": {"setup":25,"shop":595,"waves":0,"draft":75,"bots":25246,"meta":10},
+      "rng": {"setup":25,"shop":595,"waves":0,"draft":75,"bots":25246,"meta":10,"confront":0,"confront-types":49,"coop-hunt":66,"event":21,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":11},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -883,7 +883,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_3","hiddenBossId":null,"factions":["TIMES","ELEMENT","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":130,"bossPoolLeft":0,"virtualMs":185000},
-      "rng": {"setup":16,"shop":976,"waves":0,"draft":25,"bots":36267,"meta":30},
+      "rng": {"setup":16,"shop":976,"waves":0,"draft":25,"bots":36267,"meta":30,"confront":0,"confront-types":49,"coop-hunt":146,"event":36,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -1048,7 +1048,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m01","bossId":"boss_1","hiddenBossId":"boss_8","factions":["DOT","INVISIBLE","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":12,"hiddenReached":false,"hiddenCleared":false,"reason":"eliminated","teamLp":null,"bossPoolLeft":null,"virtualMs":185000},
-      "rng": {"setup":25,"shop":728,"waves":0,"draft":53,"bots":22603,"meta":76},
+      "rng": {"setup":25,"shop":728,"waves":0,"draft":53,"bots":22603,"meta":76,"confront":0,"confront-types":49,"coop-hunt":91,"event":30,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":20},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -1213,7 +1213,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_1","hiddenBossId":"boss_9","factions":["FLY","DOT","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":57,"bossPoolLeft":0,"virtualMs":176400},
-      "rng": {"setup":25,"shop":448,"waves":0,"draft":34,"bots":18184,"meta":111},
+      "rng": {"setup":25,"shop":448,"waves":0,"draft":34,"bots":18184,"meta":111,"confront":0,"confront-types":49,"coop-hunt":78,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":12},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -1324,7 +1324,7 @@
       "boost": {"lp":400,"layers":300},
       "setup": {"stageId":"act1autochess_m02","bossId":"boss_5","hiddenBossId":"boss_10","factions":["TIMES","ELEMENT","DOT"]},
       "end": {"victory":true,"roundsPassed":15,"hiddenReached":true,"hiddenCleared":true,"reason":"victory","teamLp":400,"bossPoolLeft":0,"virtualMs":113700},
-      "rng": {"setup":25,"shop":343,"waves":0,"draft":42,"bots":10350,"meta":3},
+      "rng": {"setup":25,"shop":343,"waves":0,"draft":42,"bots":10350,"meta":3,"confront":0,"confront-types":0,"coop-hunt":0,"event":0,"event-foe":0,"event-elite":0,"event-target":0,"ai-hunt":0,"duck-spawns":null},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -1408,7 +1408,7 @@
       "boost": {"lp":400,"layers":300},
       "setup": {"stageId":"act2autochess_m04","bossId":"boss_5","hiddenBossId":"boss_9","factions":["FLY","ELEMENT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":15,"hiddenReached":true,"hiddenCleared":true,"reason":"victory","teamLp":800,"bossPoolLeft":0,"virtualMs":178150},
-      "rng": {"setup":25,"shop":693,"waves":0,"draft":61,"bots":22448,"meta":142},
+      "rng": {"setup":25,"shop":693,"waves":0,"draft":61,"bots":22448,"meta":142,"confront":0,"confront-types":49,"coop-hunt":75,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":10},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -1519,7 +1519,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_5","hiddenBossId":"boss_10","factions":["DOT","INVISIBLE","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":31,"bossPoolLeft":0,"virtualMs":176900},
-      "rng": {"setup":25,"shop":480,"waves":0,"draft":34,"bots":18127,"meta":15},
+      "rng": {"setup":25,"shop":480,"waves":0,"draft":34,"bots":18127,"meta":15,"confront":0,"confront-types":56,"coop-hunt":77,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":12},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -1634,7 +1634,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_7","hiddenBossId":"boss_10","factions":["ELEMENT","INVISIBLE","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":43,"bossPoolLeft":0,"virtualMs":173400},
-      "rng": {"setup":25,"shop":710,"waves":0,"draft":34,"bots":16753,"meta":15},
+      "rng": {"setup":25,"shop":710,"waves":0,"draft":34,"bots":16753,"meta":15,"confront":0,"confront-types":49,"coop-hunt":65,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":12},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"h_0":[1,27,4,0,0,5,1,"3e4697a0",0,"",5,5,0,3],"ai_0":[1,28,4,0,0,1,2,"a1734bc6",0,"sargonShip 0/2, soloShip 1/0",5,5,0,4]},
@@ -1758,7 +1758,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_8","factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":44,"bossPoolLeft":0,"virtualMs":174900},
-      "rng": {"setup":25,"shop":505,"waves":0,"draft":40,"bots":16808,"meta":12},
+      "rng": {"setup":25,"shop":505,"waves":0,"draft":40,"bots":16808,"meta":12,"confront":0,"confront-types":49,"coop-hunt":68,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":12},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"h_0":[1,27,0,0,0,1,0,"811c9dc5",0,"",0,5,5,0],"ai_0":[1,45,4,0,0,1,2,"a39b0d9d",0,"kazimierzShip 0/2, sargonShip 0/2, swiftShip 0/2",5,5,0,4]},
@@ -1865,7 +1865,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m03","bossId":"boss_4","hiddenBossId":"boss_9","factions":["FLY","TIMES","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":72,"bossPoolLeft":0,"virtualMs":177900},
-      "rng": {"setup":25,"shop":620,"waves":0,"draft":40,"bots":19207,"meta":7},
+      "rng": {"setup":25,"shop":620,"waves":0,"draft":40,"bots":19207,"meta":7,"confront":0,"confront-types":49,"coop-hunt":78,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":10},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"h_0":[1,45,4,0,0,5,1,"7d187f13",0,"",5,5,0,4],"ai_0":[1,27,0,0,0,1,0,"811c9dc5",0,"",0,5,5,0]},
@@ -1993,7 +1993,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_8","factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"victory","teamLp":36,"bossPoolLeft":0,"virtualMs":174900},
-      "rng": {"setup":25,"shop":505,"waves":0,"draft":40,"bots":16802,"meta":12},
+      "rng": {"setup":25,"shop":505,"waves":0,"draft":40,"bots":16802,"meta":12,"confront":0,"confront-types":49,"coop-hunt":68,"event":18,"event-foe":6,"event-elite":6,"event-target":0,"ai-hunt":0,"duck-spawns":12},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {"round":1,"h_0":[1,27,0,0,0,1,0,"811c9dc5",0,"",0,5,5,0],"ai_0":[1,45,4,0,0,1,2,"a39b0d9d",0,"kazimierzShip 0/2, sargonShip 0/2, swiftShip 0/2",5,5,0,4]},
@@ -2114,7 +2114,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_7","hiddenBossId":null,"factions":["FLY","DOT","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"versus","teamLp":107,"bossPoolLeft":null,"virtualMs":186500},
-      "rng": {"setup":25,"shop":1247,"waves":0,"draft":31,"bots":35570,"meta":147},
+      "rng": {"setup":25,"shop":1247,"waves":0,"draft":31,"bots":35570,"meta":147,"confront":748,"confront-types":49,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":0,"duck-spawns":20},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -2279,7 +2279,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_2","hiddenBossId":null,"factions":["TIMES","DOT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"versus","teamLp":113,"bossPoolLeft":null,"virtualMs":182000},
-      "rng": {"setup":25,"shop":1229,"waves":0,"draft":39,"bots":36063,"meta":189},
+      "rng": {"setup":25,"shop":1229,"waves":0,"draft":39,"bots":36063,"meta":189,"confront":724,"confront-types":49,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":0,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -2444,7 +2444,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m04","bossId":"boss_5","hiddenBossId":"boss_8","factions":["FLY","ELEMENT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":true,"hiddenCleared":false,"reason":"versus","teamLp":102,"bossPoolLeft":null,"virtualMs":210050},
-      "rng": {"setup":42,"shop":1355,"waves":0,"draft":93,"bots":31361,"meta":133},
+      "rng": {"setup":42,"shop":1355,"waves":0,"draft":93,"bots":31361,"meta":133,"confront":928,"confront-types":63,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":468,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -2609,7 +2609,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_4","hiddenBossId":"boss_9","factions":["FLY","DOT","INVISIBLE"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"versus","teamLp":94,"bossPoolLeft":null,"virtualMs":187100},
-      "rng": {"setup":42,"shop":1162,"waves":0,"draft":71,"bots":35129,"meta":41},
+      "rng": {"setup":42,"shop":1162,"waves":0,"draft":71,"bots":35129,"meta":41,"confront":692,"confront-types":49,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":513,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -2774,7 +2774,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m01","bossId":"boss_4","hiddenBossId":"boss_9","factions":["FLY","DOT","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":12,"hiddenReached":false,"hiddenCleared":false,"reason":"versus-eliminated","teamLp":115,"bossPoolLeft":null,"virtualMs":193150},
-      "rng": {"setup":42,"shop":1016,"waves":0,"draft":107,"bots":25115,"meta":316},
+      "rng": {"setup":42,"shop":1016,"waves":0,"draft":107,"bots":25115,"meta":316,"confront":859,"confront-types":63,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":589,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -2939,7 +2939,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m01","bossId":"boss_2","hiddenBossId":"boss_8","factions":["FLY","TIMES","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":11,"hiddenReached":false,"hiddenCleared":false,"reason":"versus-eliminated","teamLp":135,"bossPoolLeft":null,"virtualMs":169700},
-      "rng": {"setup":42,"shop":810,"waves":0,"draft":107,"bots":23733,"meta":175},
+      "rng": {"setup":42,"shop":810,"waves":0,"draft":107,"bots":23733,"meta":175,"confront":770,"confront-types":56,"coop-hunt":0,"event":24,"event-foe":4,"event-elite":4,"event-target":8,"ai-hunt":325,"duck-spawns":16},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -3097,7 +3097,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m03","bossId":"boss_6","hiddenBossId":"boss_10","factions":["FLY","TIMES","INVISIBLE"]},
       "end": {"victory":false,"roundsPassed":10,"hiddenReached":false,"hiddenCleared":false,"reason":"versus-eliminated","teamLp":112,"bossPoolLeft":null,"virtualMs":157750},
-      "rng": {"setup":42,"shop":1001,"waves":0,"draft":127,"bots":32679,"meta":82},
+      "rng": {"setup":42,"shop":1001,"waves":0,"draft":127,"bots":32679,"meta":82,"confront":592,"confront-types":49,"coop-hunt":0,"event":24,"event-foe":4,"event-elite":4,"event-target":8,"ai-hunt":215,"duck-spawns":12},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -3248,7 +3248,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m04","bossId":"boss_4","hiddenBossId":"boss_8","factions":["TIMES","ELEMENT","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":8,"hiddenReached":false,"hiddenCleared":false,"reason":"eliminated","teamLp":111,"bossPoolLeft":null,"virtualMs":115750},
-      "rng": {"setup":42,"shop":473,"waves":0,"draft":89,"bots":18212,"meta":53},
+      "rng": {"setup":42,"shop":473,"waves":0,"draft":89,"bots":18212,"meta":53,"confront":428,"confront-types":28,"coop-hunt":0,"event":12,"event-foe":2,"event-elite":2,"event-target":4,"ai-hunt":140,"duck-spawns":8},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -3385,7 +3385,7 @@
       "boost": {"lp":400,"layers":300},
       "setup": {"stageId":"act1autochess_m01","bossId":"boss_5","hiddenBossId":null,"factions":["TIMES","ELEMENT","DOT"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":false,"hiddenCleared":false,"reason":"versus","teamLp":1600,"bossPoolLeft":null,"virtualMs":195000},
-      "rng": {"setup":25,"shop":1177,"waves":0,"draft":39,"bots":36360,"meta":155},
+      "rng": {"setup":25,"shop":1177,"waves":0,"draft":39,"bots":36360,"meta":155,"confront":892,"confront-types":63,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":0,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -3550,7 +3550,7 @@
       "boost": {"lp":400,"layers":300},
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_9","factions":["DOT","INVISIBLE","REFLECTION"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":true,"hiddenCleared":false,"reason":"versus","teamLp":1600,"bossPoolLeft":null,"virtualMs":200550},
-      "rng": {"setup":42,"shop":1600,"waves":0,"draft":127,"bots":34031,"meta":136},
+      "rng": {"setup":42,"shop":1600,"waves":0,"draft":127,"bots":34031,"meta":136,"confront":1012,"confront-types":56,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":548,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -3715,7 +3715,7 @@
       "boost": null,
       "setup": {"stageId":"act1autochess_m03","bossId":"boss_5","hiddenBossId":"boss_9","factions":["FLY","TIMES","DOT"]},
       "end": {"victory":true,"roundsPassed":14,"hiddenReached":true,"hiddenCleared":false,"reason":"versus","teamLp":108,"bossPoolLeft":null,"virtualMs":200550},
-      "rng": {"setup":42,"shop":1191,"waves":0,"draft":107,"bots":35145,"meta":40},
+      "rng": {"setup":42,"shop":1191,"waves":0,"draft":107,"bots":35145,"meta":40,"confront":832,"confront-types":56,"coop-hunt":0,"event":36,"event-foe":6,"event-elite":6,"event-target":12,"ai-hunt":564,"duck-spawns":24},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -3880,7 +3880,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m02","bossId":"boss_7","hiddenBossId":"boss_10","factions":["FLY","ELEMENT","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":10,"hiddenReached":false,"hiddenCleared":false,"reason":"versus-eliminated","teamLp":129,"bossPoolLeft":null,"virtualMs":154250},
-      "rng": {"setup":42,"shop":753,"waves":0,"draft":125,"bots":25873,"meta":79},
+      "rng": {"setup":42,"shop":753,"waves":0,"draft":125,"bots":25873,"meta":79,"confront":576,"confront-types":42,"coop-hunt":0,"event":24,"event-foe":4,"event-elite":4,"event-target":8,"ai-hunt":205,"duck-spawns":16},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
@@ -4047,7 +4047,7 @@
       "boost": null,
       "setup": {"stageId":"act2autochess_m03","bossId":"boss_1","hiddenBossId":"boss_9","factions":["TIMES","INVISIBLE","REFLECTION"]},
       "end": {"victory":false,"roundsPassed":9,"hiddenReached":false,"hiddenCleared":false,"reason":"versus-eliminated","teamLp":128,"bossPoolLeft":null,"virtualMs":145700},
-      "rng": {"setup":42,"shop":726,"waves":0,"draft":89,"bots":29877,"meta":43},
+      "rng": {"setup":42,"shop":726,"waves":0,"draft":89,"bots":29877,"meta":43,"confront":608,"confront-types":49,"coop-hunt":0,"event":24,"event-foe":4,"event-elite":4,"event-target":8,"ai-hunt":267,"duck-spawns":16},
       "errors": {"engine":0,"logged":0,"sim":0,"dispatcher":0},
       "rounds": [
         {
