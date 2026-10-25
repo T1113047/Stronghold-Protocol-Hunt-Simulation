@@ -270,7 +270,8 @@ export class PlayerState {
     /** the absolute round the entry windows are evaluated against (set by startRound; eventModsFor / battleInput). */
     this.eventRound = 0;
     this.eventTargets = [];
-    /** the ally entries this player has received so far (ids; a record — the no-repeat pool is match-global, event.js eventUsedAlly) */
+    /** the ally entries this player DREW as a picker (ids, a record only — the received entries are eventEntries and the
+     * no-repeat pool is match-global: server/match/match/event.js eventUsedAlly). */
     this.eventCards = [];
     this.eventMods = {
       atkPct: 0, aspd: 0, hpPct: 0, defPct: 0, defIgnorePct: 0, regenPct: 0, dmgTakenMul: 1, moveMul: 1, deploy: 0,
