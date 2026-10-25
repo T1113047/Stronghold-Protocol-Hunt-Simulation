@@ -736,6 +736,15 @@ export function matchScenarios() {
   for (const [difficulty, seeds] of [['FUNNY', [21, 22]], ['NORMAL', [23, 24]], ['HARD', [25, 26]], ['ABYSS', [27, 28]]]) {
     for (const seed of seeds) out.push({ id: `versus-${difficulty}-${seed}`, mode: 'versus', difficulty, bots: 4, seed });
   }
+  // the 2V2 endgame and the seats the plain runs never reach: the R14 最终攻势 + R15 隐秘核心 need the layers of both
+  // squads over the per-squad threshold (the boosted coop runs do the same), one run on the SERVER's own combat, one
+  // with a live human seat (AI 托管, offline) beside three AI so the 托管 path and the hunter are locked together, and
+  // one plain ABYSS run that ends by an elimination instead of the 4:5 decision
+  out.push({ id: 'versus-FUNNY-31-endgame', mode: 'versus', difficulty: 'FUNNY', bots: 4, seed: 31, boost: { lp: 400, layers: 300 } });
+  out.push({ id: 'versus-HARD-32-endgame', mode: 'versus', difficulty: 'HARD', bots: 4, seed: 32, boost: { lp: 400, layers: 300 } });
+  out.push({ id: 'versus-NORMAL-33-serverrun', mode: 'versus', difficulty: 'NORMAL', bots: 4, seed: 33, clientCombat: false });
+  out.push({ id: 'versus-HARD-34-mixed-human', mode: 'versus', difficulty: 'HARD', bots: 3, seed: 34, human: { notOwned: MATCH_NOT_OWNED } });
+  out.push({ id: 'versus-ABYSS-35-elimination', mode: 'versus', difficulty: 'ABYSS', bots: 4, seed: 35 });
   const humanAbout = (h) => (h.notOwned ? ` + 1 human seat (AI 托管) without ${h.notOwned.length} operators (补位 stand-ins)`
     : ` + 1 human seat (AI 托管) with ${Object.keys(h.diy || {}).length} 自选 picks${h.shopLevel ? ` and its 调度中心 at level ${h.shopLevel} from the first prep` : ''}`);
   return out.map((m) => ({ ...m, family: 'matches', kind: 'match', about: `${m.mode} ${m.difficulty}, ${m.bots} bot seat(s)${m.human ? humanAbout(m.human) : ''}, seed ${m.seed}${m.clientCombat === false ? ', server-run combat' : ''}${m.boost ? `, LP ${m.boost.lp} and ${m.boost.layers} layers per bond from the first prep` : ''}` }));
